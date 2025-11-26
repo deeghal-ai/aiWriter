@@ -92,13 +92,42 @@ export interface Persona {
   color: string;                 // "blue" | "green" | "purple" | "orange"
 }
 
+// Step 5: Verdict Generation Types
+
+export interface VerdictReason {
+  point: string;              // The reasoning statement
+  priority: string;           // Which persona priority this addresses
+  evidence: string;           // Quote or data from insights backing this
+}
+
 export interface Verdict {
-  personaId: string;
-  recommendedBike: string;
-  confidence: number;
-  reasoning: string[];
+  personaId: string;          // "persona-1" — links to Persona
+  personaName: string;        // "Arjun" — for easy display
+  personaTitle: string;       // "The First Big Bike Upgrader" — for context
+  
+  // The recommendation
+  recommendedBike: string;    // "KTM Duke 390" — the winner
+  otherBike: string;          // "Bajaj Dominar 400" — the loser
+  
+  // Confidence score (50-95%)
+  confidence: number;         // 78
+  confidenceExplanation: string;  // "78% because Duke wins on top 3 priorities but price gap is significant"
+  
+  // Why this bike wins (3-5 reasons, evidence-backed)
+  reasoning: VerdictReason[];
+  
+  // The case against (2-3 reasons when the other bike might win)
   againstReasons: string[];
-  evidence: string[];
+  
+  // Tangible impact (optional but powerful)
+  tangibleImpact?: {
+    metric: string;           // "Fuel savings over 3 years"
+    value: string;            // "₹7,920"
+    explanation: string;      // "42kmpl vs 38kmpl at 900km/month"
+  };
+  
+  // Summary one-liner for the article
+  verdictOneLiner: string;    // "For Arjun, the Duke isn't just better—it's the only choice that matches his priorities."
 }
 
 export interface ArticleSection {
@@ -179,6 +208,30 @@ export interface PersonaGenerationResult {
 export interface PersonaGenerationResponse {
   success: boolean;
   data?: PersonaGenerationResult;
+  error?: string;
+  details?: string;
+}
+
+// Step 5: Verdict Generation Result Types
+
+export interface VerdictGenerationResult {
+  verdicts: Verdict[];
+  metadata: {
+    generated_at: string;
+    total_verdicts: number;
+    average_confidence: number;
+    processing_time_ms: number;
+  };
+  summary: {
+    bike1Wins: number;        // How many personas prefer bike1
+    bike2Wins: number;        // How many personas prefer bike2
+    closestCall: string;      // "Persona 3 was closest at 55% confidence"
+  };
+}
+
+export interface VerdictGenerationResponse {
+  success: boolean;
+  data?: VerdictGenerationResult;
   error?: string;
   details?: string;
 }

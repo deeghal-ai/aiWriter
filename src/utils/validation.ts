@@ -1,4 +1,4 @@
-import type { InsightExtractionResult, BikeInsights, PersonaGenerationResult, Persona } from "@/lib/types";
+import type { InsightExtractionResult, BikeInsights, PersonaGenerationResult, Persona, VerdictGenerationResult, Verdict } from "@/lib/types";
 
 /**
  * Validate insight extraction results
@@ -268,6 +268,171 @@ export function checkPersonaQuality(result: PersonaGenerationResult): {
   if (warnings.length === 0) {
     quality = "excellent";
   } else if (warnings.length <= 3) {
+    quality = "good";
+  } else {
+    quality = "poor";
+  }
+  
+  return { quality, warnings };
+}
+
+/**
+ * Validate verdict generation results
+ */
+export function validateVerdicts(
+  result: VerdictGenerationResult,
+  personas: Persona[]
+): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  
+  // Check verdicts array exists
+  if (!result.verdicts || !Array.isArray(result.verdicts)) {
+    errors.push("Missing verdicts array");
+    return { valid: false, errors };
+  }
+  
+  // Check count matches personas
+  if (result.verdicts.length !== personas.length) {
+    errors.push(`Expected ${personas.length} verdicts, got ${result.verdicts.length}`);
+  }
+  
+  // Validate each verdict
+  result.verdicts.forEach((verdict, index) => {
+    const prefix = `Verdict ${index + 1}`;
+    
+    // Required fields
+    if (!verdict.recommendedBike) {
+      errors.push(`${prefix}: Missing recommendedBike`);
+    }
+    if (!verdict.otherBike) {
+      errors.push(`${prefix}: Missing otherBike`);
+    }
+    if (verdict.recommendedBike === verdict.otherBike) {
+      errors.push(`${prefix}: recommendedBike and otherBike are the same`);
+    }
+    
+    // Confidence range
+    if (typeof verdict.confidence !== 'number') {
+      errors.push(`${prefix}: Missing confidence`);
+    } else if (verdict.confidence < 50 || verdict.confidence > 95) {
+      errors.push(`${prefix}: Confidence ${verdict.confidence} out of range (50-95)`);
+    }
+    
+    // Reasoning
+    if (!verdict.reasoning || verdict.reasoning.length < 3) {
+      errors.push(`${prefix}: Needs at least 3 reasoning points`);
+    } else {
+      verdict.reasoning.forEach((reason, rIdx) => {
+        if (!reason.point) {
+          errors.push(`${prefix}: Reasoning ${rIdx} missing point`);
+        }
+        if (!reason.evidence) {
+          errors.push(`${prefix}: Reasoning ${rIdx} missing evidence`);
+        }
+      });
+    }
+    
+    // Against reasons
+    if (!verdict.againstReasons || verdict.againstReasons.length < 2) {
+      errors.push(`${prefix}: Needs at least 2 against reasons`);
+    }
+    
+    // One-liner
+    if (!verdict.verdictOneLiner) {
+      errors.push(`${prefix}: Missing verdictOneLiner`);
+    }
+  });
+  
+  // Check summary
+  if (!result.summary) {
+    errors.push("Missing summary object");
+  } else {
+    const totalWins = (result.summary.bike1Wins || 0) + (result.summary.bike2Wins || 0);
+    // Allow some flexibility in summary counts (might not match exactly due to bike name variations)
+    // Only error if drastically off (more than 1 verdict unaccounted for)
+    if (Math.abs(totalWins - result.verdicts.length) > 1) {
+      errors.push(`Summary wins (${totalWins}) significantly differ from verdict count (${result.verdicts.length})`);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Check verdict quality (heuristic checks)
+ */
+export function checkVerdictQuality(result: VerdictGenerationResult): {
+  quality: "excellent" | "good" | "poor";
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  
+  result.verdicts.forEach((verdict, index) => {
+    const prefix = `Verdict ${index + 1}`;
+    
+    // Check for generic reasoning
+    const genericPhrases = [
+      "better overall", "good choice", "suitable option",
+      "depends on preference", "both are good"
+    ];
+    
+    verdict.reasoning.forEach((reason, rIdx) => {
+      if (genericPhrases.some(p => reason.point.toLowerCase().includes(p))) {
+        warnings.push(`${prefix}: Reasoning ${rIdx} seems generic`);
+      }
+      
+      // Check if evidence is just repeating the point
+      if (reason.evidence.length < 20) {
+        warnings.push(`${prefix}: Reasoning ${rIdx} has weak evidence`);
+      }
+    });
+    
+    // Check against reasons specificity
+    verdict.againstReasons.forEach((reason, rIdx) => {
+      if (reason.split(' ').length < 8) {
+        warnings.push(`${prefix}: Against reason ${rIdx} too short`);
+      }
+    });
+    
+    // Check confidence explanation
+    if (!verdict.confidenceExplanation || verdict.confidenceExplanation.length < 30) {
+      warnings.push(`${prefix}: Confidence explanation too brief`);
+    }
+    
+    // Check one-liner length
+    const oneLinerWords = verdict.verdictOneLiner?.split(' ').length || 0;
+    if (oneLinerWords < 10 || oneLinerWords > 35) {
+      warnings.push(`${prefix}: One-liner should be 15-30 words, got ${oneLinerWords}`);
+    }
+    
+    // Check for fence-sitting
+    if (verdict.confidence === 50) {
+      warnings.push(`${prefix}: 50% confidence is essentially fence-sitting`);
+    }
+  });
+  
+  // Check for variety in winners
+  const bike1Wins = result.summary?.bike1Wins || 0;
+  const bike2Wins = result.summary?.bike2Wins || 0;
+  
+  if (bike1Wins === 0 || bike2Wins === 0) {
+    // Not necessarily a problem, but worth noting
+    if (result.verdicts.length >= 3) {
+      warnings.push("One bike won all verdicts—verify this is accurate");
+    }
+  }
+  
+  // Determine quality
+  let quality: "excellent" | "good" | "poor";
+  if (warnings.length === 0) {
+    quality = "excellent";
+  } else if (warnings.length <= 4) {
     quality = "good";
   } else {
     quality = "poor";

@@ -3,7 +3,7 @@
  * Modular and reusable across different AI providers
  */
 
-import type { InsightExtractionResult } from "../types";
+import type { InsightExtractionResult, Persona } from "../types";
 
 export function buildInsightExtractionPrompt(
   bike1Name: string,
@@ -266,5 +266,195 @@ Assign a color for UI display: "blue", "green", "purple", or "orange" (one per p
 Return a valid JSON object with the structure defined in the schema. Do not include any text outside the JSON structure.
 
 Begin your persona generation now.`;
+}
+
+/**
+ * Verdict Generation Prompt
+ */
+export function buildVerdictGenerationPrompt(
+  bike1Name: string,
+  bike2Name: string,
+  personas: Persona[],
+  insights: InsightExtractionResult
+): string {
+  return `You are an expert motorcycle advisor making definitive recommendations for Indian buyers. Your job is to make a CLEAR CALL for each persona—no fence-sitting, no "both are good" cop-outs.
+
+# Context
+
+You're recommending between two motorcycles:
+- **Bike 1:** ${bike1Name}
+- **Bike 2:** ${bike2Name}
+
+For each of the ${personas.length} rider personas below, you must:
+1. Pick ONE winner (the recommended bike)
+2. Assign a confidence score (50-95%)
+3. Provide 3-5 evidence-backed reasons
+4. Include 2-3 honest counter-arguments (when the other bike might win)
+
+# The Golden Rules
+
+1. **NO FENCE-SITTING**: "Both are great" is not an answer. Pick one.
+2. **CONFIDENCE MEANS SOMETHING**: 
+   - 90-95%: Clear winner, almost no reason to consider the other
+   - 80-89%: Strong winner, but specific scenarios favor the other
+   - 70-79%: Winner on balance, close in some areas
+   - 60-69%: Slight edge, personas in this range could go either way
+   - 50-59%: Coin flip, but you still have to pick
+3. **EVIDENCE REQUIRED**: Every reasoning point must reference either:
+   - A persona priority/pain point, OR
+   - A praise/complaint from the insights
+4. **HONEST COUNTER-ARGUMENTS**: The "against" reasons should be genuine scenarios where the other bike wins
+
+# Personas to Generate Verdicts For
+
+${personas.map((p, idx) => `
+## Persona ${idx + 1}: ${p.name} — "${p.title}"
+
+**In their words:** "${p.archetypeQuote}"
+
+**Usage Pattern:**
+- City Commute: ${p.usagePattern.cityCommute}%
+- Highway: ${p.usagePattern.highway}%
+- Urban Leisure: ${p.usagePattern.urbanLeisure}%
+- Off-road: ${p.usagePattern.offroad}%
+
+**Demographics:**
+- Age: ${p.demographics.ageRange}
+- City Type: ${p.demographics.cityType}
+- Occupation: ${p.demographics.occupation}
+- Income: ${p.demographics.incomeIndicator}
+- Family: ${p.demographics.familyContext}
+
+**Psychographics:**
+- Buying Motivation: ${p.psychographics.buyingMotivation}
+- Decision Style: ${p.psychographics.decisionStyle}
+- Brand Loyalty: ${p.psychographics.brandLoyalty}
+- Risk Tolerance: ${p.psychographics.riskTolerance}
+
+**Priorities (in order):**
+${p.priorities.map((pri, i) => `${i + 1}. ${pri}`).join('\n')}
+
+**Pain Points:**
+${p.painPoints.map(pp => `- ${pp}`).join('\n')}
+
+**Evidence from forums:**
+${p.evidenceQuotes.map(eq => `- "${eq}"`).join('\n')}
+`).join('\n---\n')}
+
+# Bike Data to Reference
+
+## ${bike1Name} — What Owners Say
+
+### Praises:
+${insights.bike1.praises.map(p => `
+**${p.category}** (${p.frequency} mentions)
+${p.quotes.slice(0, 2).map(q => `- "${q.text}" — ${q.author}`).join('\n')}
+`).join('\n')}
+
+### Complaints:
+${insights.bike1.complaints.map(c => `
+**${c.category}** (${c.frequency} mentions)
+${c.quotes.slice(0, 2).map(q => `- "${q.text}" — ${q.author}`).join('\n')}
+`).join('\n')}
+
+### Surprising Insights:
+${insights.bike1.surprising_insights.map(s => `- ${s}`).join('\n')}
+
+---
+
+## ${bike2Name} — What Owners Say
+
+### Praises:
+${insights.bike2.praises.map(p => `
+**${p.category}** (${p.frequency} mentions)
+${p.quotes.slice(0, 2).map(q => `- "${q.text}" — ${q.author}`).join('\n')}
+`).join('\n')}
+
+### Complaints:
+${insights.bike2.complaints.map(c => `
+**${c.category}** (${c.frequency} mentions)
+${c.quotes.slice(0, 2).map(q => `- "${q.text}" — ${q.author}`).join('\n')}
+`).join('\n')}
+
+### Surprising Insights:
+${insights.bike2.surprising_insights.map(s => `- ${s}`).join('\n')}
+
+# Your Task: Generate One Verdict Per Persona
+
+For each persona, provide:
+
+## 1. The Recommendation
+- **recommendedBike**: The winning bike's full name
+- **otherBike**: The losing bike's full name
+
+## 2. Confidence Score
+- **confidence**: A number between 50-95
+- **confidenceExplanation**: One sentence explaining why this confidence level (e.g., "85% because Duke wins on top 3 priorities but ₹80K price gap is significant for this budget-conscious buyer")
+
+## 3. Reasoning (3-5 points)
+Each reason must have:
+- **point**: The reasoning statement (specific, not generic)
+- **priority**: Which persona priority this addresses (use exact text from priorities list)
+- **evidence**: Supporting quote or data from the insights
+
+**Good Reasoning Example:**
+{
+  "point": "Your 70% city commute demands the Duke's 13.4kg lighter weight—that's a lane-splitting advantage you'll feel every ORR traffic jam",
+  "priority": "Performance and power delivery",
+  "evidence": "Forum user mentioned: 'The Duke's agility in traffic is unmatched, especially on Bangalore's ORR'"
+}
+
+**Bad Reasoning Example:**
+{
+  "point": "The Duke is better for city riding",
+  "priority": "Performance",
+  "evidence": "It's lighter"
+}
+
+## 4. Against Reasons (2-3 points)
+Specific scenarios where the OTHER bike might actually win. Be honest—not every recommendation is 95% confident.
+
+**Good Against Example:**
+- "If your highway usage increases beyond 30%, the Dominar's touring ergonomics will start to matter—15 owners mentioned all-day comfort"
+- "The ₹80K price gap could fund your first touring trip to Ladakh—factor in opportunity cost"
+
+**Bad Against Example:**
+- "The other bike is also good"
+- "Some people might prefer it"
+
+## 5. Tangible Impact (optional but powerful)
+If you can calculate a concrete impact, include it:
+{
+  "metric": "Fuel savings over 3 years",
+  "value": "₹7,920",
+  "explanation": "42kmpl vs 38kmpl at 900km/month city riding"
+}
+
+## 6. Verdict One-Liner
+A punchy summary for the article:
+- "For Arjun, the Duke isn't just better—it's the only choice that matches his need for respect without compromise."
+- "Suresh's wife vetoed the Bullet before he could finish the test ride. The Classic's pillion seat is that much better."
+
+# Decision Framework
+
+Use this framework to pick the winner:
+
+1. **Priority Matching**: Which bike satisfies more of the persona's top 3 priorities?
+2. **Pain Point Avoidance**: Which bike avoids or solves more pain points?
+3. **Usage Pattern Fit**: 
+   - High city % → weight, maneuverability, heat management matter
+   - High highway % → comfort, stability, touring features matter
+   - Pillion mentioned → seat comfort, grab rails matter
+4. **Psychographic Alignment**:
+   - Brand-conscious → which has better brand perception?
+   - Value-focused → which offers more for the money?
+   - Tech-savvy → which has better features?
+5. **Tiebreaker**: If close, use forum sentiment (which bike has more passionate defenders?)
+
+# Output Format
+
+Return a valid JSON object with the structure defined in the schema. Do not include any text outside the JSON structure.
+
+Begin generating verdicts now. Remember: NO FENCE-SITTING. Make the call.`;
 }
 

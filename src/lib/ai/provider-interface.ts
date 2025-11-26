@@ -3,7 +3,7 @@
  * Allows easy swapping between Claude, OpenAI, Gemini, etc.
  */
 
-import type { InsightExtractionResult, PersonaGenerationResult } from "../types";
+import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona } from "../types";
 
 export interface AIProvider {
   name: string;
@@ -26,6 +26,16 @@ export interface AIProvider {
     bike2Name: string,
     insights: InsightExtractionResult
   ): Promise<PersonaGenerationResult>;
+  
+  /**
+   * Generate verdicts for each persona
+   */
+  generateVerdicts(
+    bike1Name: string,
+    bike2Name: string,
+    personas: Persona[],
+    insights: InsightExtractionResult
+  ): Promise<VerdictGenerationResult>;
   
   /**
    * Check if provider is configured and ready

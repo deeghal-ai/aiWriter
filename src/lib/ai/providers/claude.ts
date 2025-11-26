@@ -4,10 +4,10 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { insightExtractionSchema, personaGenerationSchema } from "../schemas";
-import { buildInsightExtractionPrompt, buildPersonaGenerationPrompt } from "../prompts";
+import { insightExtractionSchema, personaGenerationSchema, verdictGenerationSchema } from "../schemas";
+import { buildInsightExtractionPrompt, buildPersonaGenerationPrompt, buildVerdictGenerationPrompt } from "../prompts";
 import type { AIProvider } from "../provider-interface";
-import type { InsightExtractionResult, PersonaGenerationResult } from "../../types";
+import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona } from "../../types";
 
 export class ClaudeProvider implements AIProvider {
   name = "Claude (Anthropic)";
@@ -61,18 +61,26 @@ export class ClaudeProvider implements AIProvider {
         xbhpData || { bike1: { threads: [] }, bike2: { threads: [] } }
       );
       
-      // Call Claude with JSON mode
-      // Note: Claude doesn't have response_format like OpenAI
-      // We use prompt engineering to ensure JSON output
+      // Call Claude with higher token limit for insight extraction
+      // Insights need more tokens due to quotes and multiple categories
+      const insightMaxTokens = Math.max(this.maxTokens, 8192);
+      console.log(`[Claude] Using ${insightMaxTokens} max tokens for insight extraction`);
+      
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: this.maxTokens,
+        max_tokens: insightMaxTokens,
         messages: [{
           role: "user",
           content: prompt + "\n\nIMPORTANT: Respond with ONLY valid JSON matching the schema. No markdown, no explanations, no text outside the JSON structure."
         }],
         system: "You are a data extraction expert. You always respond with valid JSON that matches the requested schema exactly."
       });
+      
+      // Check if response was truncated
+      if (response.stop_reason === "max_tokens") {
+        console.error('[Claude] Response was truncated due to max_tokens limit');
+        throw new Error("Claude response was truncated. The insights are incomplete. Increase ANTHROPIC_MAX_TOKENS in .env.local to at least 8192.");
+      }
       
       // Extract JSON from response
       const content = response.content[0];
@@ -94,10 +102,38 @@ export class ClaudeProvider implements AIProvider {
       
       console.log('[Claude] Response length:', jsonText.length, 'chars');
       
-      const insights = JSON.parse(jsonText);
+      let insights = JSON.parse(jsonText);
+      
+      // Log the top-level keys to debug structure issues
+      console.log('[Claude] Response top-level keys:', Object.keys(insights));
+      console.log('[Claude] First 500 chars of response:', JSON.stringify(insights).substring(0, 500));
+      
+      // Check if Claude wrapped the response in an extra layer or used different field names
+      // Sometimes Claude returns { insights: { bike1, bike2 } } or { data: { bike1, bike2 } }
+      if (!insights.bike1 && !insights.bike2) {
+        // Check common wrapper patterns
+        if (insights.insights) {
+          console.log('[Claude] Found nested structure at "insights" key, unwrapping...');
+          insights = insights.insights;
+        } else if (insights.data) {
+          console.log('[Claude] Found nested structure at "data" key, unwrapping...');
+          insights = insights.data;
+        } else if (insights.bikes) {
+          console.log('[Claude] Found bikes array instead of bike1/bike2 object structure');
+          // If Claude returned bikes: [bike1Data, bike2Data] instead of bike1/bike2 keys
+          if (Array.isArray(insights.bikes) && insights.bikes.length >= 2) {
+            insights = {
+              bike1: insights.bikes[0],
+              bike2: insights.bikes[1]
+            };
+          }
+        }
+      }
       
       // Validate and sanitize the parsed data
       if (!insights.bike1 || !insights.bike2) {
+        console.error('[Claude] Invalid structure after unwrapping. Available keys:', Object.keys(insights));
+        console.error('[Claude] Full response (first 1000 chars):', JSON.stringify(insights).substring(0, 1000));
         throw new Error("Invalid response structure: missing bike1 or bike2");
       }
       
@@ -396,6 +432,268 @@ export class ClaudeProvider implements AIProvider {
       
     } catch (error: any) {
       console.error("[Claude] Persona generation error:", error);
+      
+      // Handle specific Anthropic API errors
+      if (error.status === 401) {
+        throw new Error("Invalid Anthropic API key. Check your .env.local file.");
+      }
+      
+      if (error.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again in a moment.");
+      }
+      
+      if (error.status === 529) {
+        throw new Error("Claude API is overloaded. Please try again shortly.");
+      }
+      
+      throw error;
+    }
+  }
+  
+  async generateVerdicts(
+    bike1Name: string,
+    bike2Name: string,
+    personas: Persona[],
+    insights: InsightExtractionResult
+  ): Promise<VerdictGenerationResult> {
+    if (!this.client) {
+      throw new Error("Claude API not configured. Check ANTHROPIC_API_KEY in .env.local");
+    }
+    
+    const startTime = Date.now();
+    
+    try {
+      console.log(`[Claude] Generating verdicts for ${personas.length} personas`);
+      console.log(`[Claude] Bikes: ${bike1Name} vs ${bike2Name}`);
+      
+      // Build prompt
+      const prompt = buildVerdictGenerationPrompt(
+        bike1Name,
+        bike2Name,
+        personas,
+        insights
+      );
+      
+      // Call Claude with higher token limit for verdict generation
+      const verdictMaxTokens = Math.max(this.maxTokens, 8192);
+      console.log(`[Claude] Using ${verdictMaxTokens} max tokens for verdict generation`);
+      
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: verdictMaxTokens,
+        messages: [{
+          role: "user",
+          content: prompt + "\n\nIMPORTANT: Respond with ONLY valid JSON matching the schema. No markdown, no explanations. Make a DEFINITIVE call for each persona."
+        }],
+        system: "You are an expert motorcycle advisor for Indian buyers. You make clear, evidence-backed recommendations—no fence-sitting. You always respond with valid JSON."
+      });
+      
+      // Check if response was truncated
+      if (response.stop_reason === "max_tokens") {
+        console.error('[Claude] Response was truncated due to max_tokens limit');
+        throw new Error("Claude response was truncated. The verdicts are incomplete. Increase ANTHROPIC_MAX_TOKENS in .env.local to at least 8192.");
+      }
+      
+      // Extract JSON from response
+      const content = response.content[0];
+      if (content.type !== "text") {
+        throw new Error("Expected text response from Claude");
+      }
+      
+      let jsonText = content.text.trim();
+      
+      // Remove markdown code fences if present
+      if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/^```(?:json)?\n?/, '');
+        jsonText = jsonText.replace(/\n?```$/, '');
+        jsonText = jsonText.trim();
+      }
+      
+      console.log('[Claude] Raw parsed response:', JSON.stringify(JSON.parse(jsonText), null, 2).substring(0, 500));
+      
+      const parsed = JSON.parse(jsonText);
+      
+      // Validate structure
+      if (!parsed.verdicts || !Array.isArray(parsed.verdicts)) {
+        throw new Error("Invalid response: missing verdicts array");
+      }
+      
+      if (parsed.verdicts.length === 0) {
+        throw new Error("Claude returned empty verdicts array");
+      }
+      
+      // Restructure verdicts to match expected format
+      parsed.verdicts = parsed.verdicts.map((verdict: any, index: number) => {
+        const persona = personas[index];
+        
+        // Log what we have before restructuring
+        console.log(`[Claude] Verdict ${index + 1} before restructuring:`, {
+          hasPersona: !!verdict.persona,
+          hasPersonaId: !!verdict.personaId,
+          hasVerdictOneLiner: !!verdict.verdictOneLiner,
+          verdictOneLinerValue: verdict.verdictOneLiner
+        });
+        
+        let restructured;
+        
+        // Check if Claude used a different structure (e.g., "persona" field instead of personaId/personaName/personaTitle)
+        if (verdict.persona && typeof verdict.persona === 'string') {
+          // Parse "Arjun — The Engine Rebuild Opportunist" format
+          const parts = verdict.persona.split('—').map((s: string) => s.trim());
+          console.log(`[Claude] Restructuring verdict ${index + 1} from "persona" field`);
+          
+          // Pre-calculate verdictOneLiner to ensure it's set
+          const oneLiner = verdict.verdictOneLiner && verdict.verdictOneLiner.trim().length > 0
+            ? verdict.verdictOneLiner
+            : `For ${parts[0] || persona?.name}, ${verdict.recommendedBike} is the clear choice.`;
+          
+          restructured = {
+            ...verdict,
+            personaId: persona?.id || `persona-${index + 1}`,
+            personaName: parts[0] || persona?.name || 'Unknown',
+            personaTitle: parts[1] || persona?.title || 'Unknown',
+            verdictOneLiner: oneLiner
+          };
+        } else {
+          // Pre-calculate verdictOneLiner to ensure it's set
+          const oneLiner = verdict.verdictOneLiner && verdict.verdictOneLiner.trim().length > 0
+            ? verdict.verdictOneLiner
+            : `For ${verdict.personaName || persona?.name}, ${verdict.recommendedBike} is the clear choice.`;
+          
+          // Ensure all required fields are present
+          restructured = {
+            ...verdict,
+            personaId: verdict.personaId || persona?.id || `persona-${index + 1}`,
+            personaName: verdict.personaName || persona?.name || 'Unknown',
+            personaTitle: verdict.personaTitle || persona?.title || 'Unknown',
+            verdictOneLiner: oneLiner
+          };
+        }
+        
+        console.log(`[Claude] Verdict ${index + 1} after restructuring: hasVerdictOneLiner=${!!restructured.verdictOneLiner}, value="${restructured.verdictOneLiner}"`);
+        
+        return restructured;
+      });
+      
+      // Calculate metadata
+      const processingTime = Date.now() - startTime;
+      const avgConfidence = parsed.verdicts.reduce(
+        (sum: number, v: any) => sum + (v.confidence || 0), 
+        0
+      ) / parsed.verdicts.length;
+      
+      // Generate summary - count which bike each verdict recommends
+      // Use very aggressive normalization to handle variations
+      const normalizeBikeName = (name: string) => {
+        if (!name) return '';
+        // Keep only alphanumeric characters, lowercase
+        return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      };
+      
+      const bike1Normalized = normalizeBikeName(bike1Name);
+      const bike2Normalized = normalizeBikeName(bike2Name);
+      
+      console.log(`[Claude] Bike name matching: bike1="${bike1Name}" → "${bike1Normalized}", bike2="${bike2Name}" → "${bike2Normalized}"`);
+      
+      let bike1WinsCount = 0;
+      let bike2WinsCount = 0;
+      
+      parsed.verdicts.forEach((v: any, i: number) => {
+        const recommended = normalizeBikeName(v.recommendedBike || '');
+        
+        console.log(`[Claude] Verdict ${i + 1}: "${v.recommendedBike}" → normalized: "${recommended}"`);
+        
+        // Check which bike matches better
+        // Try multiple matching strategies
+        const matchesBike1 = recommended === bike1Normalized || 
+                            recommended.includes(bike1Normalized) || 
+                            bike1Normalized.includes(recommended);
+        
+        const matchesBike2 = recommended === bike2Normalized || 
+                            recommended.includes(bike2Normalized) || 
+                            bike2Normalized.includes(recommended);
+        
+        if (matchesBike1 && !matchesBike2) {
+          bike1WinsCount++;
+          console.log(`[Claude]   ✓ Matched to bike1 (${bike1Name})`);
+        } else if (matchesBike2 && !matchesBike1) {
+          bike2WinsCount++;
+          console.log(`[Claude]   ✓ Matched to bike2 (${bike2Name})`);
+        } else if (matchesBike1 && matchesBike2) {
+          // Both match - use length comparison
+          const bike1Similarity = Math.abs(recommended.length - bike1Normalized.length);
+          const bike2Similarity = Math.abs(recommended.length - bike2Normalized.length);
+          if (bike1Similarity < bike2Similarity) {
+            bike1WinsCount++;
+            console.log(`[Claude]   ✓ Matched to bike1 (closer match)`);
+          } else {
+            bike2WinsCount++;
+            console.log(`[Claude]   ✓ Matched to bike2 (closer match)`);
+          }
+        } else {
+          console.warn(`[Claude]   ✗ Could not match to either bike`);
+          // Fallback: assign to bike1 to prevent validation error
+          bike1WinsCount++;
+          console.warn(`[Claude]   → Defaulting to bike1`);
+        }
+      });
+      
+      // Find the verdict with lowest confidence
+      const lowestConfidence = Math.min(...parsed.verdicts.map((v: any) => v.confidence || 100));
+      const closestVerdict = parsed.verdicts.find((v: any) => v.confidence === lowestConfidence);
+      
+      const summary = {
+        bike1Wins: bike1WinsCount,
+        bike2Wins: bike2WinsCount,
+        closestCall: closestVerdict 
+          ? `${closestVerdict.personaName || 'One persona'} was the closest call at ${lowestConfidence}% confidence`
+          : `Lowest confidence: ${lowestConfidence}%`
+      };
+      
+      console.log(`[Claude] Summary calculation: ${summary.bike1Wins} for bike1 + ${summary.bike2Wins} for bike2 = ${summary.bike1Wins + summary.bike2Wins} total (expected ${parsed.verdicts.length})`);
+      
+      // Ensure all verdicts have verdictOneLiner (generate if missing)
+      parsed.verdicts = parsed.verdicts.map((verdict: any) => {
+        if (!verdict.verdictOneLiner || verdict.verdictOneLiner.length === 0) {
+          console.warn(`[Claude] Verdict for ${verdict.personaName} missing verdictOneLiner, generating fallback`);
+          verdict.verdictOneLiner = `For ${verdict.personaName}, ${verdict.recommendedBike} is the clear choice based on their priorities.`;
+        }
+        return verdict;
+      });
+      
+      // Log verdict details for debugging
+      parsed.verdicts.forEach((v: any, i: number) => {
+        console.log(`[Claude] Verdict ${i + 1}: ${v.personaName} → ${v.recommendedBike} (${v.confidence}%)`);
+      });
+      
+      console.log(`[Claude] Verdict generation complete in ${processingTime}ms`);
+      console.log(`[Claude] Generated ${parsed.verdicts.length} verdicts`);
+      console.log(`[Claude] Summary: ${summary.bike1Wins} for ${bike1Name}, ${summary.bike2Wins} for ${bike2Name}`);
+      console.log(`[Claude] Usage: ${response.usage.input_tokens} input, ${response.usage.output_tokens} output tokens`);
+      
+      // Final check: log what we're returning
+      console.log(`[Claude] Final verdicts check:`, parsed.verdicts.map((v: any) => ({
+        personaName: v.personaName,
+        recommendedBike: v.recommendedBike,
+        hasVerdictOneLiner: !!v.verdictOneLiner,
+        verdictOneLiner: v.verdictOneLiner?.substring(0, 50)
+      })));
+      
+      const result = {
+        verdicts: parsed.verdicts,
+        summary: summary,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          total_verdicts: parsed.verdicts.length,
+          average_confidence: Math.round(avgConfidence),
+          processing_time_ms: processingTime
+        }
+      };
+      
+      return result;
+      
+    } catch (error: any) {
+      console.error("[Claude] Verdict generation error:", error);
       
       // Handle specific Anthropic API errors
       if (error.status === 401) {

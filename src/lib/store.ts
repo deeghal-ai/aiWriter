@@ -9,7 +9,8 @@ import type {
   ArticleSection,
   QualityCheck,
   InsightExtractionResult,
-  PersonaGenerationResult 
+  PersonaGenerationResult,
+  VerdictGenerationResult 
 } from './types';
 
 interface AppState {
@@ -40,7 +41,8 @@ interface AppState {
   isGeneratingPersonas: boolean;
   
   // Step 5: Verdicts
-  verdicts: Verdict[];
+  verdicts: VerdictGenerationResult | null;
+  isGeneratingVerdicts: boolean;
   
   // Step 6: Article sections
   articleSections: ArticleSection[];
@@ -60,7 +62,8 @@ interface AppState {
   setInsights: (insights: InsightExtractionResult) => void;
   setPersonas: (personas: PersonaGenerationResult | null) => void;
   setIsGeneratingPersonas: (isGenerating: boolean) => void;
-  setVerdicts: (verdicts: Verdict[]) => void;
+  setVerdicts: (verdicts: VerdictGenerationResult | null) => void;
+  setIsGeneratingVerdicts: (isGenerating: boolean) => void;
   setArticleSections: (sections: ArticleSection[]) => void;
   setQualityChecks: (checks: QualityCheck[]) => void;
   setFinalArticle: (article: string) => void;
@@ -81,7 +84,8 @@ export const useAppStore = create<AppState>()(
       insights: null,
       personas: null,
       isGeneratingPersonas: false,
-      verdicts: [],
+      verdicts: null,
+      isGeneratingVerdicts: false,
       articleSections: [],
       articleWordCount: 0,
       qualityChecks: [],
@@ -106,6 +110,8 @@ export const useAppStore = create<AppState>()(
       setIsGeneratingPersonas: (isGenerating) => set({ isGeneratingPersonas: isGenerating }),
       
       setVerdicts: (verdicts) => set({ verdicts }),
+      
+      setIsGeneratingVerdicts: (isGenerating) => set({ isGeneratingVerdicts: isGenerating }),
       
       setArticleSections: (sections) => 
         set((state) => ({
@@ -138,7 +144,8 @@ export const useAppStore = create<AppState>()(
         insights: null,
         personas: null,
         isGeneratingPersonas: false,
-        verdicts: [],
+        verdicts: null,
+        isGeneratingVerdicts: false,
         articleSections: [],
         articleWordCount: 0,
         qualityChecks: [],
