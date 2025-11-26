@@ -89,3 +89,45 @@ export interface QualityCheck {
   }>;
 }
 
+// Step 3: Insight Extraction Types
+
+export interface InsightQuote {
+  text: string;
+  author: string;
+  source: string; // "Reddit" or "xBhp"
+  url?: string;
+}
+
+export interface InsightCategory {
+  category: string;
+  frequency: number;
+  quotes: InsightQuote[];
+}
+
+export interface BikeInsights {
+  name: string;
+  praises: InsightCategory[];
+  complaints: InsightCategory[];
+  surprising_insights: string[];
+}
+
+export interface InsightExtractionResult {
+  bike1: BikeInsights;
+  bike2: BikeInsights;
+  metadata: {
+    extracted_at: string;
+    total_praises: number;
+    total_complaints: number;
+    total_quotes: number;
+    processing_time_ms: number;
+  };
+}
+
+// API Response types
+export interface InsightExtractionResponse {
+  success: boolean;
+  data?: InsightExtractionResult;
+  error?: string;
+  details?: string;
+}
+

@@ -1,4 +1,4 @@
-# AI Writer
+# BikeDekho AI Writer
 
 A multi-step wizard interface for an AI-powered motorcycle comparison article generator.
 

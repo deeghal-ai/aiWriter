@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { StepSidebar } from '@/components/layout/StepSidebar';
 import { Step1Input } from '@/components/steps/Step1Input';
@@ -25,7 +26,20 @@ const stepComponents = {
 
 export default function Home() {
   const currentStep = useAppStore((state) => state.currentStep);
+  const resetWorkflow = useAppStore((state) => state.resetWorkflow);
   const StepComponent = stepComponents[currentStep as keyof typeof stepComponents];
+  
+  // Reset workflow on initial page load
+  useEffect(() => {
+    // Check if this is a fresh page load (not a hot reload in development)
+    const hasReloaded = sessionStorage.getItem('hasReloaded');
+    
+    if (!hasReloaded) {
+      // First load - reset the workflow
+      resetWorkflow();
+      sessionStorage.setItem('hasReloaded', 'true');
+    }
+  }, [resetWorkflow]);
   
   return (
     <div className="min-h-screen bg-slate-50">

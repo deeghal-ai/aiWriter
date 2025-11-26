@@ -7,7 +7,8 @@ import type {
   Persona, 
   Verdict, 
   ArticleSection,
-  QualityCheck 
+  QualityCheck,
+  InsightExtractionResult 
 } from './types';
 
 interface AppState {
@@ -23,19 +24,15 @@ interface AppState {
   // Step 2: Scraping data
   scrapingProgress: ScrapingProgress[];
   
+  // NEW: Raw scraped data
+  scrapedData: {
+    reddit?: any;
+    xbhp?: any;
+    youtube?: any;
+  };
+  
   // Step 3: Extracted insights
-  insights: {
-    bike1: {
-      praises: Insight[];
-      complaints: Insight[];
-      surprisingInsights: string[];
-    };
-    bike2: {
-      praises: Insight[];
-      complaints: Insight[];
-      surprisingInsights: string[];
-    };
-  } | null;
+  insights: InsightExtractionResult | null;
   
   // Step 4: Personas
   personas: Persona[];
@@ -58,23 +55,26 @@ interface AppState {
   markStepComplete: (step: number) => void;
   setComparison: (comparison: BikeComparison) => void;
   setScrapingProgress: (progress: ScrapingProgress[]) => void;
-  setInsights: (insights: AppState['insights']) => void;
+  setInsights: (insights: InsightExtractionResult) => void;
   setPersonas: (personas: Persona[]) => void;
   setVerdicts: (verdicts: Verdict[]) => void;
   setArticleSections: (sections: ArticleSection[]) => void;
   setQualityChecks: (checks: QualityCheck[]) => void;
   setFinalArticle: (article: string) => void;
+  setScrapedData: (source: 'reddit' | 'xbhp' | 'youtube', data: any) => void;
+  getScrapedData: (source: 'reddit' | 'xbhp' | 'youtube') => any;
   resetWorkflow: () => void;
 }
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       currentStep: 1,
       completedSteps: [],
       comparison: null,
       scrapingProgress: [],
+      scrapedData: {},
       insights: null,
       personas: [],
       verdicts: [],
@@ -111,11 +111,24 @@ export const useAppStore = create<AppState>()(
       
       setFinalArticle: (article) => set({ finalArticle: article }),
       
+      setScrapedData: (source, data) =>
+        set((state) => ({
+          scrapedData: {
+            ...state.scrapedData,
+            [source]: data
+          }
+        })),
+      
+      getScrapedData: (source) => {
+        return get().scrapedData[source];
+      },
+      
       resetWorkflow: () => set({
         currentStep: 1,
         completedSteps: [],
         comparison: null,
         scrapingProgress: [],
+        scrapedData: {},
         insights: null,
         personas: [],
         verdicts: [],
