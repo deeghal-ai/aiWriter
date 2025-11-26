@@ -3,7 +3,7 @@
  * Allows easy swapping between Claude, OpenAI, Gemini, etc.
  */
 
-import type { InsightExtractionResult } from "../types";
+import type { InsightExtractionResult, PersonaGenerationResult } from "../types";
 
 export interface AIProvider {
   name: string;
@@ -17,6 +17,15 @@ export interface AIProvider {
     redditData: any,
     xbhpData?: any
   ): Promise<InsightExtractionResult>;
+  
+  /**
+   * Generate rider personas from extracted insights
+   */
+  generatePersonas(
+    bike1Name: string,
+    bike2Name: string,
+    insights: InsightExtractionResult
+  ): Promise<PersonaGenerationResult>;
   
   /**
    * Check if provider is configured and ready

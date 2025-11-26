@@ -1,4 +1,4 @@
-import type { InsightExtractionResult, BikeInsights } from "@/lib/types";
+import type { InsightExtractionResult, BikeInsights, PersonaGenerationResult, Persona } from "@/lib/types";
 
 /**
  * Validate insight extraction results
@@ -140,6 +140,135 @@ export function checkInsightQuality(insights: InsightExtractionResult): {
     quality = "good";
   } else if (warnings.length <= 2) {
     quality = "acceptable";
+  } else {
+    quality = "poor";
+  }
+  
+  return { quality, warnings };
+}
+
+/**
+ * Validate persona generation results
+ */
+export function validatePersonas(result: PersonaGenerationResult): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  
+  // Check personas array exists
+  if (!result.personas || !Array.isArray(result.personas)) {
+    errors.push("Missing personas array");
+    return { valid: false, errors };
+  }
+  
+  // Check count
+  if (result.personas.length < 3 || result.personas.length > 4) {
+    errors.push(`Expected 3-4 personas, got ${result.personas.length}`);
+  }
+  
+  // Validate each persona
+  result.personas.forEach((persona, index) => {
+    const prefix = `Persona ${index + 1}`;
+    
+    // Required fields
+    if (!persona.name) errors.push(`${prefix}: Missing name`);
+    if (!persona.title) errors.push(`${prefix}: Missing title`);
+    if (typeof persona.percentage !== 'number') errors.push(`${prefix}: Missing percentage`);
+    
+    // Usage pattern must sum to 100
+    if (persona.usagePattern) {
+      const sum = 
+        (persona.usagePattern.cityCommute || 0) +
+        (persona.usagePattern.highway || 0) +
+        (persona.usagePattern.urbanLeisure || 0) +
+        (persona.usagePattern.offroad || 0);
+      
+      if (sum !== 100) {
+        errors.push(`${prefix}: Usage pattern sums to ${sum}, expected 100`);
+      }
+    } else {
+      errors.push(`${prefix}: Missing usagePattern`);
+    }
+    
+    // Evidence quotes required
+    if (!persona.evidenceQuotes || persona.evidenceQuotes.length < 2) {
+      errors.push(`${prefix}: Needs at least 2 evidence quotes`);
+    }
+    
+    // Archetype quote required
+    if (!persona.archetypeQuote) {
+      errors.push(`${prefix}: Missing archetypeQuote`);
+    }
+  });
+  
+  // Check percentage sum (should be 85-100%)
+  const totalPercentage = result.personas.reduce((sum, p) => sum + (p.percentage || 0), 0);
+  if (totalPercentage < 70 || totalPercentage > 100) {
+    errors.push(`Total percentage is ${totalPercentage}%, expected 85-100%`);
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Check persona quality (heuristic checks)
+ */
+export function checkPersonaQuality(result: PersonaGenerationResult): {
+  quality: "excellent" | "good" | "poor";
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  
+  result.personas.forEach((persona, index) => {
+    const prefix = `Persona ${index + 1}`;
+    
+    // Check for generic titles
+    const genericTitles = [
+      "The Commuter", "The Enthusiast", "The Professional",
+      "The Value Buyer", "The Performance Seeker", "The City Rider"
+    ];
+    if (genericTitles.some(g => persona.title?.toLowerCase().includes(g.toLowerCase()))) {
+      warnings.push(`${prefix}: Title "${persona.title}" seems generic`);
+    }
+    
+    // Check archetype quote length
+    if (persona.archetypeQuote) {
+      const words = persona.archetypeQuote.split(' ').length;
+      if (words < 10 || words > 30) {
+        warnings.push(`${prefix}: Archetype quote should be 15-25 words, got ${words}`);
+      }
+    }
+    
+    // Check priorities specificity
+    const genericPriorities = ["performance", "value", "quality", "comfort"];
+    if (persona.priorities?.some(p => genericPriorities.includes(p.toLowerCase()))) {
+      warnings.push(`${prefix}: Some priorities are too generic`);
+    }
+    
+    // Check for Indian context
+    const indianIndicators = ["₹", "km", "India", "Bangalore", "Mumbai", "Delhi", "pillion"];
+    const hasIndianContext = [
+      persona.demographics?.cityType,
+      persona.demographics?.incomeIndicator,
+      ...persona.painPoints || [],
+      persona.archetypeQuote
+    ].some(text => text && indianIndicators.some(ind => text.includes(ind)));
+    
+    if (!hasIndianContext) {
+      warnings.push(`${prefix}: May lack Indian context`);
+    }
+  });
+  
+  // Determine overall quality
+  let quality: "excellent" | "good" | "poor";
+  if (warnings.length === 0) {
+    quality = "excellent";
+  } else if (warnings.length <= 3) {
+    quality = "good";
   } else {
     quality = "poor";
   }

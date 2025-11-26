@@ -5,6 +5,7 @@
 
 import { ClaudeProvider } from './providers/claude';
 import type { AIProvider } from './provider-interface';
+import type { InsightExtractionResult } from '../types';
 
 /**
  * Get the configured AI provider
@@ -76,5 +77,58 @@ export async function extractInsightsWithRetry(
   }
   
   throw lastError || new Error("Failed to extract insights after retries");
+}
+
+/**
+ * Generate rider personas from extracted insights
+ */
+export async function generatePersonas(
+  bike1Name: string,
+  bike2Name: string,
+  insights: InsightExtractionResult
+) {
+  const provider = getAIProvider();
+  
+  if (!provider.isConfigured()) {
+    throw new Error(`AI provider ${provider.name} is not configured`);
+  }
+  
+  return provider.generatePersonas(bike1Name, bike2Name, insights);
+}
+
+/**
+ * Generate personas with retry logic
+ */
+export async function generatePersonasWithRetry(
+  bike1Name: string,
+  bike2Name: string,
+  insights: InsightExtractionResult,
+  maxRetries: number = 3
+) {
+  let lastError: Error | null = null;
+  const provider = getAIProvider();
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Factory] Persona generation attempt ${attempt}/${maxRetries}`);
+      return await provider.generatePersonas(bike1Name, bike2Name, insights);
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[Factory] Attempt ${attempt} failed:`, error.message);
+      
+      // Don't retry on auth errors
+      if (error.message.includes("Invalid API key") || error.message.includes("authentication")) {
+        throw error;
+      }
+      
+      if (attempt < maxRetries) {
+        const delay = 1000 * attempt; // Linear backoff: 1s, 2s, 3s
+        console.log(`[Factory] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error("Persona generation failed after all retries");
 }
 

@@ -39,24 +39,57 @@ export interface Insight {
   }>;
 }
 
+// Enhanced Persona Interface for Step 4
 export interface Persona {
-  id: string;
-  title: string;
-  percentage: number;
-  pattern: {
-    cityCommute: number;
-    highway: number;
-    leisure: number;
-    offroad: number;
+  id: string;                    // "persona-1", "persona-2", etc.
+  
+  // Identity (specific, not generic)
+  name: string;                  // "Naveen" - an actual Indian name
+  title: string;                 // "The Whitefield Commuter with Weekend Highway Dreams"
+  
+  // Prevalence in data
+  percentage: number;            // 28 (represents 28% of forum discussions match this pattern)
+  sampleSize: number;            // 12 (actual count of users matching this pattern)
+  
+  // Usage Pattern (percentages must sum to 100)
+  usagePattern: {
+    cityCommute: number;         // 60
+    highway: number;             // 25
+    urbanLeisure: number;        // 10
+    offroad: number;             // 5
   };
+  
+  // Demographics (specific to Indian context)
   demographics: {
-    ageRange: string;
-    location: string;
-    occupation: string;
+    ageRange: string;            // "28-34"
+    cityType: string;            // "Metro (Bangalore, Mumbai)" or "Tier-2 (Pune, Jaipur)"
+    occupation: string;          // "IT Professional, Mid-level"
+    incomeIndicator: string;     // "Can afford ₹2-3L bike, EMI-conscious"
+    familyContext: string;       // "Married, spouse is regular pillion"
   };
-  priorities: string[];
-  quote: string;
-  sampleSize: number;
+  
+  // Psychographics
+  psychographics: {
+    buyingMotivation: string;    // "Practical upgrade" or "Status symbol" or "Pure passion"
+    decisionStyle: string;       // "Spec-sheet researcher" or "Emotional, test-ride driven"
+    brandLoyalty: string;        // "Open to all" or "RE loyalist" or "Japanese-only"
+    riskTolerance: string;       // "Conservative (proven models only)" or "Early adopter"
+  };
+  
+  // Priorities (ordered by importance)
+  priorities: string[];          // ["Pillion comfort", "Service network", "Fuel economy"]
+  
+  // Pain Points (specific, not generic)
+  painPoints: string[];          // ["4th floor walk-up, heavy bike is a problem", "Wife complains about heat"]
+  
+  // Evidence from data
+  evidenceQuotes: string[];      // Direct quotes from insights that support this persona
+  
+  // The persona's voice
+  archetypeQuote: string;        // "I need it to survive Silk Board AND have something left for weekends"
+  
+  // For UI display
+  color: string;                 // "blue" | "green" | "purple" | "orange"
 }
 
 export interface Verdict {
@@ -127,6 +160,25 @@ export interface InsightExtractionResult {
 export interface InsightExtractionResponse {
   success: boolean;
   data?: InsightExtractionResult;
+  error?: string;
+  details?: string;
+}
+
+// Step 4: Persona Generation Types
+
+export interface PersonaGenerationResult {
+  personas: Persona[];
+  metadata: {
+    generated_at: string;
+    total_personas: number;
+    total_evidence_quotes: number;
+    processing_time_ms: number;
+  };
+}
+
+export interface PersonaGenerationResponse {
+  success: boolean;
+  data?: PersonaGenerationResult;
   error?: string;
   details?: string;
 }

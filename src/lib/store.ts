@@ -8,7 +8,8 @@ import type {
   Verdict, 
   ArticleSection,
   QualityCheck,
-  InsightExtractionResult 
+  InsightExtractionResult,
+  PersonaGenerationResult 
 } from './types';
 
 interface AppState {
@@ -35,7 +36,8 @@ interface AppState {
   insights: InsightExtractionResult | null;
   
   // Step 4: Personas
-  personas: Persona[];
+  personas: PersonaGenerationResult | null;
+  isGeneratingPersonas: boolean;
   
   // Step 5: Verdicts
   verdicts: Verdict[];
@@ -56,7 +58,8 @@ interface AppState {
   setComparison: (comparison: BikeComparison) => void;
   setScrapingProgress: (progress: ScrapingProgress[]) => void;
   setInsights: (insights: InsightExtractionResult) => void;
-  setPersonas: (personas: Persona[]) => void;
+  setPersonas: (personas: PersonaGenerationResult | null) => void;
+  setIsGeneratingPersonas: (isGenerating: boolean) => void;
   setVerdicts: (verdicts: Verdict[]) => void;
   setArticleSections: (sections: ArticleSection[]) => void;
   setQualityChecks: (checks: QualityCheck[]) => void;
@@ -76,7 +79,8 @@ export const useAppStore = create<AppState>()(
       scrapingProgress: [],
       scrapedData: {},
       insights: null,
-      personas: [],
+      personas: null,
+      isGeneratingPersonas: false,
       verdicts: [],
       articleSections: [],
       articleWordCount: 0,
@@ -98,6 +102,8 @@ export const useAppStore = create<AppState>()(
       setInsights: (insights) => set({ insights }),
       
       setPersonas: (personas) => set({ personas }),
+      
+      setIsGeneratingPersonas: (isGenerating) => set({ isGeneratingPersonas: isGenerating }),
       
       setVerdicts: (verdicts) => set({ verdicts }),
       
@@ -130,7 +136,8 @@ export const useAppStore = create<AppState>()(
         scrapingProgress: [],
         scrapedData: {},
         insights: null,
-        personas: [],
+        personas: null,
+        isGeneratingPersonas: false,
         verdicts: [],
         articleSections: [],
         articleWordCount: 0,
