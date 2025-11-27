@@ -18,9 +18,9 @@ export function Step1Input() {
   const [bike1, setBike1] = useState('');
   const [bike2, setBike2] = useState('');
   const [sources, setSources] = useState({
-    xbhp: true,
-    teamBhp: true,
-    reddit: true,
+    xbhp: false,
+    teamBhp: false,
+    reddit: false,
     youtube: true,
     instagram: false
   });
@@ -104,11 +104,7 @@ export function Step1Input() {
             
             <div className="space-y-3">
               {[
-                { id: 'xbhp', label: 'xBhp Forums', recommended: true },
-                { id: 'teamBhp', label: 'Team-BHP', recommended: true },
-                { id: 'reddit', label: 'Reddit r/IndianBikes', recommended: true },
-                { id: 'youtube', label: 'YouTube Comments (top 5 videos per bike)', recommended: true },
-                { id: 'instagram', label: 'Instagram (slower, optional)', recommended: false }
+                { id: 'youtube', label: 'YouTube Comments (top 5 videos per bike)', recommended: true }
               ].map((source) => (
                 <div key={source.id} className="flex items-center gap-3">
                   <Checkbox
@@ -132,7 +128,7 @@ export function Step1Input() {
           {/* Estimated time */}
           <div className="pt-4 border-t bg-slate-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
             <p className="text-sm text-slate-600">
-              <strong>Estimated research time:</strong> 5-8 minutes
+              <strong>Estimated research time:</strong> 2-3 minutes
             </p>
           </div>
         </CardContent>

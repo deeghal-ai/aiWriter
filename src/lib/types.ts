@@ -236,3 +236,108 @@ export interface VerdictGenerationResponse {
   details?: string;
 }
 
+// Step 6: Article Generation Types
+
+export interface NarrativePlan {
+  story_angle: string;
+  hook_strategy: 'WhatsApp Debate' | 'Unexpected Truth' | 'Specific Scenario' | 'Price Paradox';
+  hook_elements: {
+    scenario: string;
+    tension: string;
+    promise: string;
+  };
+  truth_bomb: string;
+  quote_allocation: {
+    hook: string[];
+    matrix_engine: string[];
+    matrix_comfort: string[];
+    matrix_ownership: string[];
+    verdict: string[];
+  };
+  tension_points: Array<{
+    dimension: string;
+    bike1_wins: string;
+    bike2_wins: string;
+  }>;
+  matrix_focus_areas: string[];
+  contrarian_angle: {
+    target_persona: string;
+    why_they_might_hate_winner: string;
+  };
+  closing_insight: string;
+  callbacks: Array<{
+    introduce_in: string;
+    callback_in: string;
+    element: string;
+  }>;
+}
+
+export interface CoherenceEdits {
+  transitions_added: Array<{
+    between: string;
+    transition: string;
+  }>;
+  callbacks_added: Array<{
+    in_section: string;
+    callback: string;
+  }>;
+  contradictions_found: Array<{
+    section1: string;
+    section2: string;
+    issue: string;
+  }>;
+  word_count_suggestion: string;
+}
+
+export interface QualityReport {
+  wordCount: {
+    total: number;
+    inRange: boolean;
+  };
+  bannedPhrases: {
+    found: string[];
+  };
+  quoteCount: {
+    total: number;
+    hasEnough: boolean;
+  };
+  specificityCheck: {
+    hasSpecificCities: boolean;
+    hasSpecificRoads: boolean;
+    hasSpecificPrices: boolean;
+    hasSpecificMileage: boolean;
+  };
+  balanceCheck: {
+    bike1Mentions: number;
+    bike2Mentions: number;
+    isBalanced: boolean;
+  };
+  personaReferences: {
+    [personaName: string]: boolean;
+  };
+  structureCheck: {
+    hasHook: boolean;
+    hasVerdicts: boolean;
+    hasContrarian: boolean;
+  };
+}
+
+export interface ArticleGenerationResult {
+  sections: ArticleSection[];
+  narrativePlan: NarrativePlan;
+  qualityReport?: QualityReport;
+  metadata: {
+    generated_at: string;
+    total_words: number;
+    section_count: number;
+    processing_time_ms: number;
+  };
+}
+
+export interface ArticleGenerationResponse {
+  success: boolean;
+  data?: ArticleGenerationResult;
+  error?: string;
+  details?: string;
+}
+
