@@ -48,6 +48,7 @@ export function Step3Extract() {
       }
       setHasInitialized(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasInitialized, storedInsights, comparison, scrapedData.reddit, hasStarted]);
   
   const startExtraction = async () => {

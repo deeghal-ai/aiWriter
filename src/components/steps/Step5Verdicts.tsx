@@ -40,6 +40,7 @@ export function Step5Verdicts() {
     if (personas && insights && !verdicts && !isGeneratingVerdicts) {
       startGeneration();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personas, insights]);
   
   // Progress animation
@@ -320,7 +321,7 @@ function VerdictCard({ verdict, index }: { verdict: Verdict; index: number }) {
                       Priority: {reason.priority}
                     </p>
                     <p className="text-xs text-slate-600 mt-1 italic">
-                      Evidence: "{reason.evidence}"
+                      Evidence: &quot;{reason.evidence}&quot;
                     </p>
                   </div>
                 </div>

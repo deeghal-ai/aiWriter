@@ -59,6 +59,7 @@ export function Step2Scrape() {
       
       setHasInitialized(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasInitialized, scrapedData.reddit, comparison]);
   
   const updateStatus = (source: string, update: Partial<ScrapingStatus>) => {

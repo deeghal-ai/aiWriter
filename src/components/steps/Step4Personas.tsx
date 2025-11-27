@@ -41,6 +41,7 @@ export function Step4Personas() {
     if (insights && !personas && !isGeneratingPersonas) {
       startGeneration();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insights]);
   
   // Progress animation
@@ -274,7 +275,7 @@ function PersonaCard({ persona }: { persona: Persona }) {
         <div className={`p-3 rounded-lg ${bgClasses[persona.color as keyof typeof bgClasses]}`}>
           <div className="flex gap-2">
             <Quote className="h-4 w-4 mt-1 flex-shrink-0 opacity-60" />
-            <p className="text-sm italic">"{persona.archetypeQuote}"</p>
+            <p className="text-sm italic">&quot;{persona.archetypeQuote}&quot;</p>
           </div>
         </div>
         

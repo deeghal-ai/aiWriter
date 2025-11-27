@@ -56,7 +56,7 @@ export function Step1Input() {
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">Enter Comparison Bikes</h2>
         <p className="text-slate-600">
-          Start by entering the two bikes you want to compare. We'll research them across forums and communities.
+          Start by entering the two bikes you want to compare. We&apos;ll research them across forums and communities.
         </p>
       </div>
       
