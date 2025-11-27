@@ -465,4 +465,5 @@ ${bike2Name}:
 </output>
 
 JSON verdict:`;
+}
 
