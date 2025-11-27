@@ -390,8 +390,8 @@ export function filterInsightsForPersona(persona: any, insights: any): any {
   );
   
   const filterByRelevance = (items: any[]) => 
-    items.filter(item => 
-      priorityKeywords.some(kw => item.category.toLowerCase().includes(kw))
+    items.filter((item: any) => 
+      priorityKeywords.some((kw: string) => item.category.toLowerCase().includes(kw))
     ).slice(0, 3);
   
   return {
