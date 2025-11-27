@@ -32,6 +32,7 @@ export function Step3Extract() {
   const [error, setError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [useSonnet, setUseSonnet] = useState(true); // Use Sonnet by default for better quality
   
   // Check for existing insights or auto-start extraction when component mounts
   useEffect(() => {
@@ -67,7 +68,11 @@ export function Step3Extract() {
     }, 1000);
     
     try {
-      const response = await fetch('/api/extract/insights', {
+      // Use Sonnet endpoint for better quality, or regular endpoint for speed
+      const endpoint = useSonnet ? '/api/extract/insights-sonnet' : '/api/extract/insights';
+      console.log(`[Extract] Using ${useSonnet ? 'Sonnet (quality)' : 'Haiku (speed)'} model`);
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,6 +136,55 @@ export function Step3Extract() {
         </p>
       </div>
       
+      {/* Model Selection - only show before extraction starts or when re-extracting */}
+      {!extractedInsights && !isExtracting && (
+        <Card className="mb-6 border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <h3 className="font-semibold text-blue-900">Choose Extraction Quality</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setUseSonnet(true)}
+                  className={`p-4 rounded-lg border-2 text-left transition ${
+                    useSonnet 
+                      ? 'border-blue-600 bg-blue-100' 
+                      : 'border-gray-300 bg-white hover:border-gray-400'
+                  }`}
+                >
+                  <div className="font-semibold text-lg">Sonnet (Quality)</div>
+                  <div className="text-sm mt-1">
+                    • 8-10 praise categories<br />
+                    • 6-8 complaint categories<br />
+                    • 40+ quotes<br />
+                    • Highly specific insights<br />
+                    • ~20 seconds
+                  </div>
+                  {useSonnet && <Badge className="mt-2 bg-blue-600">Recommended</Badge>}
+                </button>
+                
+                <button
+                  onClick={() => setUseSonnet(false)}
+                  className={`p-4 rounded-lg border-2 text-left transition ${
+                    !useSonnet 
+                      ? 'border-blue-600 bg-blue-100' 
+                      : 'border-gray-300 bg-white hover:border-gray-400'
+                  }`}
+                >
+                  <div className="font-semibold text-lg">Haiku (Speed)</div>
+                  <div className="text-sm mt-1">
+                    • 5 praise categories<br />
+                    • 5 complaint categories<br />
+                    • 13 quotes<br />
+                    • Generic insights<br />
+                    • ~14 seconds
+                  </div>
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       {/* Extraction Status */}
       {isExtracting && (
         <Card className="mb-6">
@@ -139,9 +193,14 @@ export function Step3Extract() {
               <div className="flex items-center gap-3">
                 <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                 <div>
-                  <p className="font-medium">Analyzing forum data with Claude...</p>
+                  <p className="font-medium">
+                    Analyzing forum data with Claude {useSonnet ? 'Sonnet' : 'Haiku'}...
+                  </p>
                   <p className="text-sm text-slate-600">
-                    This may take 30-60 seconds
+                    {useSonnet 
+                      ? 'Extracting comprehensive insights with high specificity (~20s)' 
+                      : 'Quick extraction for basic insights (~14s)'
+                    }
                   </p>
                 </div>
               </div>
@@ -181,9 +240,14 @@ export function Step3Extract() {
           {/* Summary Stats */}
           <Card className="mb-6">
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <p className="font-medium text-green-900">Analysis Complete</p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <p className="font-medium text-green-900">Analysis Complete</p>
+                </div>
+                <Badge variant="outline">
+                  {useSonnet ? 'Sonnet Quality' : 'Haiku Speed'}
+                </Badge>
               </div>
               
               <div className="grid grid-cols-3 gap-4">
