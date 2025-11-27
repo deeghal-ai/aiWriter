@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execa } from 'execa';
-import path from 'path';
+import { scrapeRedditForComparison } from '@/lib/scrapers/reddit-scraper';
 
-export const runtime = 'nodejs';
-export const maxDuration = 120; // 120 seconds (2 minutes)
+export const maxDuration = 60; // 60 seconds for scraping
 
 interface RedditScrapeRequest {
   bike1: string;
@@ -21,39 +19,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const pythonScript = path.join(
-      process.cwd(),
-      'src',
-      'lib',
-      'scrapers',
-      'reddit_scraper.py'
-    );
-    
     console.log('[Reddit] Starting scrape for:', bike1, 'vs', bike2);
     
-    // Execute Python script (no credentials needed!)
-    // Using system python3 (no venv required)
-    const { stdout, stderr } = await execa('python3', [
-      pythonScript,
-      bike1,
-      bike2
-    ], {
-      timeout: 120000 // 120 second timeout (2 minutes)
-    });
-    
-    if (stderr) {
-      console.log('[Reddit] Stderr output:', stderr);
-    }
-    
-    const results = JSON.parse(stdout);
-    
-    if (results.error) {
-      console.error('[Reddit] Scraping error:', results.error);
-      return NextResponse.json(
-        { error: results.error },
-        { status: 500 }
-      );
-    }
+    // Scrape Reddit using TypeScript scraper (works on Vercel!)
+    const results = await scrapeRedditForComparison(bike1, bike2);
     
     console.log('[Reddit] Scraping complete:', {
       posts: results.metadata.total_posts,
