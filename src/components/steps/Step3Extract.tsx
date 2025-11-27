@@ -23,6 +23,7 @@ export function Step3Extract() {
   const setCurrentStep = useAppStore((state) => state.setCurrentStep);
   const markStepComplete = useAppStore((state) => state.markStepComplete);
   const setInsights = useAppStore((state) => state.setInsights);
+  const storedInsights = useAppStore((state) => state.insights);
   
   const [selectedBike, setSelectedBike] = useState<'bike1' | 'bike2'>('bike1');
   const [isExtracting, setIsExtracting] = useState(false);
@@ -30,14 +31,24 @@ export function Step3Extract() {
   const [extractedInsights, setExtractedInsights] = useState<InsightExtractionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
   
-  // Auto-start extraction when component mounts (only once)
+  // Check for existing insights or auto-start extraction when component mounts
   useEffect(() => {
-    if (comparison && scrapedData.reddit && !extractedInsights && !hasStarted) {
-      setHasStarted(true);
-      startExtraction();
+    if (!hasInitialized) {
+      if (storedInsights) {
+        // Restore existing insights
+        setExtractedInsights(storedInsights);
+        setHasStarted(true);
+        setProgress(100);
+      } else if (comparison && scrapedData.reddit && !hasStarted) {
+        // Only start extraction if no existing insights
+        setHasStarted(true);
+        startExtraction();
+      }
+      setHasInitialized(true);
     }
-  }, [comparison, scrapedData.reddit, extractedInsights, hasStarted]);
+  }, [hasInitialized, storedInsights, comparison, scrapedData.reddit, hasStarted]);
   
   const startExtraction = async () => {
     if (!comparison || !scrapedData.reddit) {
@@ -45,7 +56,6 @@ export function Step3Extract() {
       return;
     }
     
-    setHasStarted(true);
     setIsExtracting(true);
     setError(null);
     setProgress(0);
@@ -201,6 +211,24 @@ export function Step3Extract() {
             </CardContent>
           </Card>
           
+          {/* Restart button */}
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold mb-1">Extraction Complete</h3>
+                  <p className="text-sm text-slate-600">
+                    Want to re-analyze with fresh insights? Click to restart extraction.
+                  </p>
+                </div>
+                <Button onClick={startExtraction} variant="outline" className="gap-2" disabled={isExtracting}>
+                  <RefreshCw className="h-4 w-4" />
+                  Restart Extraction
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
           {/* Bike Tabs */}
           <Tabs value={selectedBike} onValueChange={(v) => setSelectedBike(v as any)}>
             <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -328,29 +356,15 @@ export function Step3Extract() {
           Back
         </Button>
         
-        <div className="flex gap-2">
-          {extractedInsights && (
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={startExtraction}
-              className="gap-2"
-              disabled={isExtracting}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Re-run Extraction
-            </Button>
-          )}
-          <Button
-            onClick={handleNext}
-            disabled={!extractedInsights}
-            size="lg"
-            className="gap-2"
-          >
-            Build Personas
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          onClick={handleNext}
+          disabled={!extractedInsights}
+          size="lg"
+          className="gap-2"
+        >
+          Build Personas
+          <ArrowRight className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

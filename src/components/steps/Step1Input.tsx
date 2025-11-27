@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +9,12 @@ import { ArrowRight } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
 export function Step1Input() {
+  const comparison = useAppStore((state) => state.comparison);
   const setComparison = useAppStore((state) => state.setComparison);
   const setCurrentStep = useAppStore((state) => state.setCurrentStep);
   const markStepComplete = useAppStore((state) => state.markStepComplete);
   
+  // Initialize from store if available
   const [bike1, setBike1] = useState('');
   const [bike2, setBike2] = useState('');
   const [sources, setSources] = useState({
@@ -22,6 +24,17 @@ export function Step1Input() {
     youtube: true,
     instagram: false
   });
+  
+  // Restore existing comparison data when returning to this step
+  useEffect(() => {
+    if (comparison) {
+      setBike1(comparison.bike1 || '');
+      setBike2(comparison.bike2 || '');
+      if (comparison.researchSources) {
+        setSources(comparison.researchSources);
+      }
+    }
+  }, [comparison]);
   
   const handleSubmit = () => {
     // Save to store
