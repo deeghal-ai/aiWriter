@@ -95,7 +95,7 @@ export async function scrapeYouTubeEnhanced(
         if (fetchTranscripts) {
           const transcript = await fetchTranscriptWithLibrary(result.videoId);
           if (transcript) {
-            videoData.transcript = summarizeTranscript(transcript, 1000);
+            videoData.transcript = summarizeTranscript(transcript, 3000); // Increased from 1000 to 3000
             videoData.transcriptKeyMoments = transcript.keyMoments.map(km => ({
               topic: km.topic,
               text: km.text
@@ -175,7 +175,7 @@ export async function scrapeComparisonVideos(
       // Fetch transcript for comparisons (very valuable)
       const transcript = await fetchTranscriptWithLibrary(result.videoId);
       if (transcript) {
-        videoData.transcript = summarizeTranscript(transcript, 1500);  // More for comparisons
+        videoData.transcript = summarizeTranscript(transcript, 4000);  // Increased from 1500 to 4000 for comparisons
         videoData.transcriptKeyMoments = transcript.keyMoments.map(km => ({
           topic: km.topic,
           text: km.text

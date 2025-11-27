@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
           channelTitle: v.channelTitle,
           publishedAt: v.publishedAt,
           viewCount: v.viewCount.toString(),
+          transcript: v.transcript || null, // Include transcript data!
+          transcriptKeyMoments: v.transcriptKeyMoments || [], // Include key moments!
           comments: v.comments.map(c => ({
             author: c.author,
             text: c.text,
@@ -72,6 +74,8 @@ export async function POST(request: NextRequest) {
           channelTitle: v.channelTitle,
           publishedAt: v.publishedAt,
           viewCount: v.viewCount.toString(),
+          transcript: v.transcript || null, // Include transcript data!
+          transcriptKeyMoments: v.transcriptKeyMoments || [], // Include key moments!
           comments: v.comments.map(c => ({
             author: c.author,
             text: c.text,
