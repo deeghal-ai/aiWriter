@@ -38,76 +38,110 @@ interface RedditScrapingResult {
 }
 
 /**
- * Scrapes Reddit for a single bike
+ * Scrapes Reddit for a single bike with retry logic
  */
-async function scrapeRedditForBike(bikeName: string): Promise<RedditPost[]> {
+async function scrapeRedditForBike(bikeName: string, retries = 3): Promise<RedditPost[]> {
   const subreddit = 'IndianBikes';
   const limit = 10; // Number of posts to fetch per bike
   
-  try {
-    // Step 1: Search for posts
-    const searchUrl = `https://www.reddit.com/r/${subreddit}/search.json`;
-    const searchParams = new URLSearchParams({
-      q: bikeName,
-      restrict_sr: 'on',
-      limit: limit.toString(),
-      sort: 'relevance',
-      t: 'all'
-    });
-
-    console.log(`[Reddit] Searching for: ${bikeName}`);
-    
-    const searchResponse = await fetch(`${searchUrl}?${searchParams}`, {
-      headers: {
-        'User-Agent': 'BikeDekho-Research/1.0 (Educational Project)',
-        'Accept': 'application/json'
-      }
-    });
-
-    if (!searchResponse.ok) {
-      throw new Error(`Reddit API error: ${searchResponse.status}`);
-    }
-
-    const searchData = await searchResponse.json();
-    const posts = searchData.data?.children || [];
-
-    console.log(`[Reddit] Found ${posts.length} posts for ${bikeName}`);
-
-    // Step 2: Fetch comments for each post
-    const postsWithComments: RedditPost[] = [];
-    
-    for (const post of posts) {
-      const postData = post.data;
-      
-      // Fetch top 5 comments for this post
-      const comments = await fetchPostComments(postData.permalink, 5);
-      
-      postsWithComments.push({
-        title: postData.title,
-        url: postData.url,
-        selftext: postData.selftext || '',
-        author: postData.author,
-        created_utc: postData.created_utc,
-        num_comments: postData.num_comments,
-        score: postData.score,
-        permalink: postData.permalink,
-        comments: comments
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // Step 1: Search for posts
+      const searchUrl = `https://www.reddit.com/r/${subreddit}/search.json`;
+      const searchParams = new URLSearchParams({
+        q: bikeName,
+        restrict_sr: 'on',
+        limit: limit.toString(),
+        sort: 'relevance',
+        t: 'all'
       });
 
-      // Small delay to be respectful to Reddit's servers
-      await delay(100);
+      console.log(`[Reddit] Searching for: ${bikeName} (attempt ${attempt}/${retries})`);
+      
+      const searchResponse = await fetch(`${searchUrl}?${searchParams}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; BikeDekho/1.0; +https://bikedekho.com)',
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      });
+
+      if (!searchResponse.ok) {
+        const errorText = await searchResponse.text();
+        console.error(`[Reddit] API error ${searchResponse.status}: ${errorText.slice(0, 200)}`);
+        
+        // Handle 403 Forbidden (Reddit blocking Vercel IPs)
+        if (searchResponse.status === 403) {
+          console.warn(`[Reddit] Access forbidden (403) - Reddit is blocking cloud server IPs`);
+          // Don't retry on 403, return empty results instead
+          return [];
+        }
+        
+        // Retry on rate limit or server errors
+        if (searchResponse.status === 429 || searchResponse.status >= 500) {
+          if (attempt < retries) {
+            const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+            console.log(`[Reddit] Retrying in ${waitTime}ms...`);
+            await delay(waitTime);
+            continue;
+          }
+        }
+        
+        throw new Error(`Reddit API error: ${searchResponse.status} ${searchResponse.statusText}`);
+      }
+
+      const searchData = await searchResponse.json();
+      const posts = searchData.data?.children || [];
+
+      console.log(`[Reddit] Found ${posts.length} posts for ${bikeName}`);
+
+      // Step 2: Fetch comments for each post
+      const postsWithComments: RedditPost[] = [];
+      
+      for (const post of posts) {
+        const postData = post.data;
+        
+        // Fetch top 5 comments for this post
+        const comments = await fetchPostComments(postData.permalink, 5);
+        
+        postsWithComments.push({
+          title: postData.title,
+          url: postData.url,
+          selftext: postData.selftext || '',
+          author: postData.author,
+          created_utc: postData.created_utc,
+          num_comments: postData.num_comments,
+          score: postData.score,
+          permalink: postData.permalink,
+          comments: comments
+        });
+
+        // Small delay to be respectful to Reddit's servers
+        await delay(200);
+      }
+
+      return postsWithComments;
+
+    } catch (error) {
+      console.error(`[Reddit] Error scraping for ${bikeName} (attempt ${attempt}):`, error);
+      
+      if (attempt === retries) {
+        throw error;
+      }
+      
+      // Wait before retrying
+      await delay(2000);
     }
-
-    return postsWithComments;
-
-  } catch (error) {
-    console.error(`[Reddit] Error scraping for ${bikeName}:`, error);
-    throw error;
   }
+  
+  // Should never reach here, but TypeScript needs this
+  throw new Error(`Failed to scrape Reddit after ${retries} attempts`);
 }
 
 /**
- * Fetches top comments for a specific post
+ * Fetches top comments for a specific post with retry logic
  */
 async function fetchPostComments(permalink: string, limit: number = 5): Promise<RedditComment[]> {
   try {
@@ -115,13 +149,16 @@ async function fetchPostComments(permalink: string, limit: number = 5): Promise<
     
     const response = await fetch(commentsUrl, {
       headers: {
-        'User-Agent': 'BikeDekho-Research/1.0 (Educational Project)',
-        'Accept': 'application/json'
-      }
+        'User-Agent': 'Mozilla/5.0 (compatible; BikeDekho/1.0; +https://bikedekho.com)',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000) // 15 second timeout
     });
 
     if (!response.ok) {
-      console.warn(`[Reddit] Failed to fetch comments for ${permalink}`);
+      console.warn(`[Reddit] Failed to fetch comments for ${permalink}: ${response.status}`);
       return [];
     }
 
@@ -179,7 +216,14 @@ export async function scrapeRedditForComparison(
     bike1Posts.reduce((sum, post) => sum + post.comments.length, 0) +
     bike2Posts.reduce((sum, post) => sum + post.comments.length, 0);
 
-  console.log(`[Reddit] Scraping complete: ${totalPosts} posts, ${totalComments} comments`);
+  // Check if we got blocked (both bikes returned empty)
+  const wasBlocked = totalPosts === 0;
+  
+  if (wasBlocked) {
+    console.warn(`[Reddit] No data retrieved - likely blocked by Reddit. Consider using Reddit API credentials.`);
+  } else {
+    console.log(`[Reddit] Scraping complete: ${totalPosts} posts, ${totalComments} comments`);
+  }
 
   // Return in same format as Python scraper
   return {
@@ -193,7 +237,7 @@ export async function scrapeRedditForComparison(
     },
     metadata: {
       scraped_at: new Date().toISOString(),
-      source: 'reddit',
+      source: wasBlocked ? 'reddit_blocked' : 'reddit',
       subreddit: 'IndianBikes',
       total_posts: totalPosts,
       total_comments: totalComments

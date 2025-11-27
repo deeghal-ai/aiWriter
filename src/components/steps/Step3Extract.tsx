@@ -41,7 +41,7 @@ export function Step3Extract() {
         setExtractedInsights(storedInsights);
         setHasStarted(true);
         setProgress(100);
-      } else if (comparison && scrapedData.reddit && !hasStarted) {
+      } else if (comparison && (scrapedData.reddit || scrapedData.youtube) && !hasStarted) {
         // Only start extraction if no existing insights
         setHasStarted(true);
         startExtraction();
@@ -49,10 +49,10 @@ export function Step3Extract() {
       setHasInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasInitialized, storedInsights, comparison, scrapedData.reddit, hasStarted]);
+  }, [hasInitialized, storedInsights, comparison, scrapedData.reddit, scrapedData.youtube, hasStarted]);
   
   const startExtraction = async () => {
-    if (!comparison || !scrapedData.reddit) {
+    if (!comparison || (!scrapedData.reddit && !scrapedData.youtube)) {
       setError("Missing scraped data. Please complete Step 2 first.");
       return;
     }
@@ -74,6 +74,7 @@ export function Step3Extract() {
           bike1Name: comparison.bike1,
           bike2Name: comparison.bike2,
           redditData: scrapedData.reddit,
+          youtubeData: scrapedData.youtube,
           xbhpData: scrapedData.xbhp
         })
       });

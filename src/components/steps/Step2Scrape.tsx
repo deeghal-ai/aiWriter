@@ -28,29 +28,27 @@ export function Step2Scrape() {
   const scrapedData = useAppStore((state) => state.scrapedData);
   
   const [statuses, setStatuses] = useState<ScrapingStatus[]>([
-    { source: 'Reddit r/IndianBikes', status: 'pending' }
+    { source: 'YouTube Reviews', status: 'pending' }
   ]);
   const [isComplete, setIsComplete] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   
   useEffect(() => {
     if (!hasInitialized) {
-      // Check if we already have scraped data
-      const existingRedditData = scrapedData.reddit;
+      // Check if we already have scraped YouTube data
+      const existingYouTubeData = scrapedData.youtube;
       
-      if (existingRedditData) {
+      if (existingYouTubeData) {
         // Restore the completed state
-        setStatuses([
-          { 
-            source: 'Reddit r/IndianBikes', 
-            status: 'complete',
-            data: existingRedditData,
-            stats: {
-              posts: existingRedditData.metadata?.total_posts || 0,
-              comments: existingRedditData.metadata?.total_comments || 0
-            }
+        setStatuses([{
+          source: 'YouTube Reviews', 
+          status: 'complete',
+          data: existingYouTubeData,
+          stats: {
+            posts: existingYouTubeData.bike1?.total_videos + existingYouTubeData.bike2?.total_videos || 0,
+            comments: existingYouTubeData.bike1?.total_comments + existingYouTubeData.bike2?.total_comments || 0
           }
-        ]);
+        }]);
         setIsComplete(true);
       } else if (comparison) {
         // Only start scraping if no existing data
@@ -60,7 +58,7 @@ export function Step2Scrape() {
       setHasInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasInitialized, scrapedData.reddit, comparison]);
+  }, [hasInitialized, scrapedData.youtube, comparison]);
   
   const updateStatus = (source: string, update: Partial<ScrapingStatus>) => {
     setStatuses(prev => 
@@ -89,13 +87,17 @@ export function Step2Scrape() {
       
       const result = await response.json();
       
+      // Check if Reddit blocked us
+      const wasBlocked = result.warning || result.data.metadata.total_posts === 0;
+      
       updateStatus('Reddit r/IndianBikes', {
         status: 'complete',
         data: result.data,
         stats: {
           posts: result.data.metadata.total_posts,
           comments: result.data.metadata.total_comments
-        }
+        },
+        message: wasBlocked ? 'Reddit blocked access (0 posts). App will continue without Reddit data.' : undefined
       });
       
       setScrapedData('reddit', result.data);
@@ -109,9 +111,54 @@ export function Step2Scrape() {
     }
   };
   
+  const scrapeYouTube = async () => {
+    if (!comparison) return;
+    
+    updateStatus('YouTube Reviews', { status: 'in-progress' });
+    
+    try {
+      const response = await fetch('/api/scrape/youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bike1: comparison.bike1,
+          bike2: comparison.bike2
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      const totalVideos = result.data.bike1.total_videos + result.data.bike2.total_videos;
+      const totalComments = result.data.bike1.total_comments + result.data.bike2.total_comments;
+      
+      updateStatus('YouTube Reviews', {
+        status: 'complete',
+        data: result.data,
+        stats: {
+          posts: totalVideos,
+          comments: totalComments
+        }
+      });
+      
+      setScrapedData('youtube', result.data);
+      
+    } catch (error) {
+      console.error('YouTube scraping error:', error);
+      updateStatus('YouTube Reviews', {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  };
+  
   const startScraping = async () => {
-    // Only scrape Reddit (removed xBhp dummy data)
-    await scrapeReddit();
+    // Only scrape YouTube for now
+    await scrapeYouTube();
     
     // Check if scraping completed successfully
     setStatuses(prev => {
@@ -125,7 +172,7 @@ export function Step2Scrape() {
   
   const restartScraping = () => {
     setStatuses([
-      { source: 'Reddit r/IndianBikes', status: 'pending' }
+      { source: 'YouTube Reviews', status: 'pending' }
     ]);
     setIsComplete(false);
     startScraping();
@@ -143,9 +190,9 @@ export function Step2Scrape() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2">Scraping Forum Threads</h2>
+        <h2 className="text-3xl font-bold mb-2">Scraping Video Reviews</h2>
         <p className="text-slate-600">
-          Collecting owner experiences from multiple sources
+          Collecting owner experiences from YouTube reviews and discussions
         </p>
       </div>
       
@@ -160,7 +207,7 @@ export function Step2Scrape() {
               </div>
               <Progress value={undefined} className="h-2" />
               <p className="text-sm text-slate-600">
-                This may take 1-2 minutes. Both sources are being scraped in parallel.
+                This may take 30-45 seconds. Fetching videos and comments from YouTube.
               </p>
             </div>
           )}
@@ -240,6 +287,9 @@ export function Step2Scrape() {
                     )}
                     {status.status === 'error' && (
                       <p className="text-sm text-red-600">{status.message}</p>
+                    )}
+                    {status.status === 'complete' && status.message && (
+                      <p className="text-sm text-amber-600">{status.message}</p>
                     )}
                   </div>
                 </div>
@@ -348,8 +398,10 @@ function ScrapedDataView({
             const bike2Data = status.data.bike2;
             const sourceKey = status.source.replace(/\s+/g, '-');
             
-            const bike1Posts = bike1Data?.posts || [];
-            const bike2Posts = bike2Data?.posts || [];
+            // Handle both Reddit (posts) and YouTube (videos) formats
+            const bike1Posts = bike1Data?.posts || bike1Data?.videos || [];
+            const bike2Posts = bike2Data?.posts || bike2Data?.videos || [];
+            const isYouTube = status.source.includes('YouTube');
             
             const bike1Visible = visiblePosts[`${sourceKey}-bike1`] || INITIAL_POSTS;
             const bike2Visible = visiblePosts[`${sourceKey}-bike2`] || INITIAL_POSTS;
@@ -391,7 +443,7 @@ function ScrapedDataView({
                                     {post.title}
                                   </p>
                                   <p className="text-xs text-slate-500">
-                                    {post.author} • {post.comments?.length || 0} comments
+                                    {isYouTube ? post.channelTitle : post.author} • {post.comments?.length || 0} comments
                                   </p>
                                 </div>
                                 {isExpanded ? (
@@ -404,7 +456,24 @@ function ScrapedDataView({
                             
                             {isExpanded && (
                               <div className="px-4 pb-4 space-y-3 border-t border-slate-200 pt-3 mt-2">
-                                {post.selftext && (
+                                {isYouTube && post.videoId && (
+                                  <div className="text-sm text-slate-700 bg-white p-3 rounded">
+                                    <p className="font-medium text-xs text-slate-500 mb-2">VIDEO:</p>
+                                    <a 
+                                      href={`https://www.youtube.com/watch?v=${post.videoId}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      Watch on YouTube →
+                                    </a>
+                                    {post.description && (
+                                      <p className="mt-2 text-slate-600">{post.description.substring(0, 200)}...</p>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {!isYouTube && post.selftext && (
                                   <div className="text-sm text-slate-700 bg-white p-3 rounded">
                                     <p className="font-medium text-xs text-slate-500 mb-2">POST CONTENT:</p>
                                     <p className="whitespace-pre-wrap">{post.selftext}</p>
@@ -419,9 +488,9 @@ function ScrapedDataView({
                                     {post.comments.map((comment: any, cIdx: number) => (
                                       <div key={cIdx} className="bg-white p-3 rounded text-sm border-l-2 border-blue-200">
                                         <p className="text-xs text-slate-500 mb-1">
-                                          {comment.author} • {comment.score || 0} points
+                                          {comment.author} • {isYouTube ? `${comment.likeCount || 0} likes` : `${comment.score || 0} points`}
                                         </p>
-                                        <p className="text-slate-700">{comment.body}</p>
+                                        <p className="text-slate-700">{isYouTube ? comment.text : comment.body}</p>
                                       </div>
                                     ))}
                                   </div>
@@ -477,7 +546,7 @@ function ScrapedDataView({
                                     {post.title}
                                   </p>
                                   <p className="text-xs text-slate-500">
-                                    {post.author} • {post.comments?.length || 0} comments
+                                    {isYouTube ? post.channelTitle : post.author} • {post.comments?.length || 0} comments
                                   </p>
                                 </div>
                                 {isExpanded ? (
@@ -490,7 +559,24 @@ function ScrapedDataView({
                             
                             {isExpanded && (
                               <div className="px-4 pb-4 space-y-3 border-t border-slate-200 pt-3 mt-2">
-                                {post.selftext && (
+                                {isYouTube && post.videoId && (
+                                  <div className="text-sm text-slate-700 bg-white p-3 rounded">
+                                    <p className="font-medium text-xs text-slate-500 mb-2">VIDEO:</p>
+                                    <a 
+                                      href={`https://www.youtube.com/watch?v=${post.videoId}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      Watch on YouTube →
+                                    </a>
+                                    {post.description && (
+                                      <p className="mt-2 text-slate-600">{post.description.substring(0, 200)}...</p>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {!isYouTube && post.selftext && (
                                   <div className="text-sm text-slate-700 bg-white p-3 rounded">
                                     <p className="font-medium text-xs text-slate-500 mb-2">POST CONTENT:</p>
                                     <p className="whitespace-pre-wrap">{post.selftext}</p>
@@ -505,9 +591,9 @@ function ScrapedDataView({
                                     {post.comments.map((comment: any, cIdx: number) => (
                                       <div key={cIdx} className="bg-white p-3 rounded text-sm border-l-2 border-blue-200">
                                         <p className="text-xs text-slate-500 mb-1">
-                                          {comment.author} • {comment.score || 0} points
+                                          {comment.author} • {isYouTube ? `${comment.likeCount || 0} likes` : `${comment.score || 0} points`}
                                         </p>
-                                        <p className="text-slate-700">{comment.body}</p>
+                                        <p className="text-slate-700">{isYouTube ? comment.text : comment.body}</p>
                                       </div>
                                     ))}
                                   </div>

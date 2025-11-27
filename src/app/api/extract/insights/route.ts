@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractInsightsWithRetry } from "@/lib/ai/factory";
 import { validateInsights, checkInsightQuality } from "@/utils/validation";
+import { preprocessScrapedData, estimateTokenCount } from "@/lib/scrapers/data-preprocessor";
 import type { InsightExtractionResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -9,7 +10,8 @@ export const maxDuration = 120; // 120 seconds (2 minutes)
 interface InsightExtractionRequest {
   bike1Name: string;
   bike2Name: string;
-  redditData: any;
+  redditData?: any;
+  youtubeData?: any;
   xbhpData?: any;
 }
 
@@ -28,11 +30,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (!body.redditData) {
+    if (!body.redditData && !body.youtubeData) {
       return NextResponse.json(
         {
           success: false,
-          error: "Reddit data is required"
+          error: "Scraped data is required (Reddit or YouTube)"
         } as InsightExtractionResponse,
         { status: 400 }
       );
@@ -52,13 +54,36 @@ export async function POST(request: NextRequest) {
     
     console.log(`[API] Starting insight extraction for ${body.bike1Name} vs ${body.bike2Name}`);
     console.log(`[API] Using AI provider: ${process.env.AI_PROVIDER || 'claude'}`);
+    console.log(`[API] Data sources: ${body.redditData ? 'Reddit' : ''}${body.youtubeData ? ' YouTube' : ''}${body.xbhpData ? ' xBhp' : ''}`);
+    
+    // Preprocess data to reduce token count
+    let processedRedditData = body.redditData;
+    let processedYouTubeData = body.youtubeData;
+    let processedXbhpData = body.xbhpData;
+    
+    // Preprocess YouTube data if present (it's usually the largest)
+    if (body.youtubeData) {
+      const originalTokens = estimateTokenCount(body.youtubeData);
+      processedYouTubeData = preprocessScrapedData(body.youtubeData, 'youtube');
+      const processedTokens = estimateTokenCount(processedYouTubeData);
+      console.log(`[API] YouTube data: ${originalTokens} tokens → ${processedTokens} tokens (reduced by ${Math.round((1 - processedTokens/originalTokens) * 100)}%)`);
+    }
+    
+    // Preprocess Reddit data if present
+    if (body.redditData) {
+      const originalTokens = estimateTokenCount(body.redditData);
+      processedRedditData = preprocessScrapedData(body.redditData, 'reddit');
+      const processedTokens = estimateTokenCount(processedRedditData);
+      console.log(`[API] Reddit data: ${originalTokens} tokens → ${processedTokens} tokens (reduced by ${Math.round((1 - processedTokens/originalTokens) * 100)}%)`);
+    }
     
     // Extract insights with retry
+    // Pass YouTube data as redditData if Reddit is not available
     const insights = await extractInsightsWithRetry(
       body.bike1Name,
       body.bike2Name,
-      body.redditData,
-      body.xbhpData
+      processedRedditData || processedYouTubeData,
+      processedXbhpData
     );
     
     // Validate results

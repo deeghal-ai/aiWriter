@@ -137,6 +137,16 @@ export class ClaudeProvider implements AIProvider {
         throw new Error("Invalid response structure: missing bike1 or bike2");
       }
       
+      // Transform bike_name to name if needed (Claude sometimes uses bike_name)
+      if (insights.bike1.bike_name && !insights.bike1.name) {
+        insights.bike1.name = insights.bike1.bike_name;
+        delete insights.bike1.bike_name;
+      }
+      if (insights.bike2.bike_name && !insights.bike2.name) {
+        insights.bike2.name = insights.bike2.bike_name;
+        delete insights.bike2.bike_name;
+      }
+      
       // Ensure praises and complaints arrays exist
       insights.bike1.praises = insights.bike1.praises || [];
       insights.bike1.complaints = insights.bike1.complaints || [];

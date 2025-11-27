@@ -38,13 +38,15 @@ Analyze the provided forum data and extract:
 
 # Source Data
 
-<reddit_data>
+<forum_data>
 ${JSON.stringify(redditData, null, 2)}
-</reddit_data>
+</forum_data>
 
-<xbhp_data>
+<additional_data>
 ${JSON.stringify(xbhpData, null, 2)}
-</xbhp_data>
+</additional_data>
+
+Note: Forum data may include Reddit posts, YouTube video reviews and comments, or other sources. Analyze all provided content regardless of the source.
 
 # Critical Instructions
 
@@ -70,8 +72,9 @@ ${JSON.stringify(xbhpData, null, 2)}
    - Examples: "Owners report better fuel economy than claimed", "Pillion comfort worse than expected despite marketing"
 
 5. **Source Attribution**:
-   - Always cite whether quote came from Reddit or xBhp
-   - Preserve author username (or use "Anonymous" if deleted)
+   - Always cite the source: Reddit, xBhp, YouTube, etc.
+   - Preserve author/channel username (or use "Anonymous" if unavailable)
+   - For YouTube, include channel name if available
 
 # Output Format
 
