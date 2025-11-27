@@ -1022,9 +1022,24 @@ export class ClaudeProvider implements AIProvider {
       
       const processingTime = Date.now() - startTime;
       
-      // Calculate summary
-      const bike1Wins = verdicts.filter(v => v.recommendedBike === bike1Name).length;
-      const bike2Wins = verdicts.filter(v => v.recommendedBike === bike2Name).length;
+      // Log verdicts for debugging
+      console.log(`[Claude-Optimized] Verdicts received:`, verdicts.map(v => ({
+        persona: v.personaName,
+        recommended: v.recommendedBike,
+        confidence: v.confidence
+      })));
+      
+      // Calculate summary with case-insensitive comparison
+      const normalizeName = (name: string) => name.toLowerCase().trim();
+      const bike1Normalized = normalizeName(bike1Name);
+      const bike2Normalized = normalizeName(bike2Name);
+      
+      const bike1Wins = verdicts.filter(v => 
+        normalizeName(v.recommendedBike) === bike1Normalized
+      ).length;
+      const bike2Wins = verdicts.filter(v => 
+        normalizeName(v.recommendedBike) === bike2Normalized
+      ).length;
       const avgConfidence = verdicts.reduce((sum, v) => sum + v.confidence, 0) / verdicts.length;
       
       const closestCall = verdicts.reduce((min, v) => 
@@ -1034,6 +1049,13 @@ export class ClaudeProvider implements AIProvider {
       console.log(`[Claude-Optimized] ✅ Parallel verdict generation complete in ${processingTime}ms (${Math.round(processingTime/1000)}s)`);
       console.log(`[Claude-Optimized] Results: ${bike1Wins} for ${bike1Name}, ${bike2Wins} for ${bike2Name}`);
       console.log(`[Claude-Optimized] Average confidence: ${Math.round(avgConfidence)}%`);
+      
+      // Validation check
+      if (bike1Wins + bike2Wins !== verdicts.length) {
+        console.warn(`[Claude-Optimized] Warning: Some verdicts may have incorrect bike names`);
+        console.warn(`[Claude-Optimized] Expected bikes: "${bike1Name}", "${bike2Name}"`);
+        console.warn(`[Claude-Optimized] Actual recommendations:`, verdicts.map(v => v.recommendedBike));
+      }
       
       return {
         verdicts,
@@ -1102,6 +1124,22 @@ export class ClaudeProvider implements AIProvider {
     jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     
     const verdict = JSON.parse(jsonText);
+    
+    // Normalize bike names to match input (Claude sometimes returns variations)
+    const normalizeName = (name: string) => name.toLowerCase().trim();
+    const bike1Norm = normalizeName(bike1Name);
+    const bike2Norm = normalizeName(bike2Name);
+    const recommendedNorm = normalizeName(verdict.recommendedBike);
+    const otherNorm = normalizeName(verdict.otherBike);
+    
+    // Correct the bike names if they're variations
+    if (recommendedNorm.includes(bike1Norm.split(' ')[0]) || bike1Norm.includes(recommendedNorm.split(' ')[0])) {
+      verdict.recommendedBike = bike1Name;
+      verdict.otherBike = bike2Name;
+    } else if (recommendedNorm.includes(bike2Norm.split(' ')[0]) || bike2Norm.includes(recommendedNorm.split(' ')[0])) {
+      verdict.recommendedBike = bike2Name;
+      verdict.otherBike = bike1Name;
+    }
     
     console.log(`[Claude-Optimized] ✓ ${persona.name}: Recommends ${verdict.recommendedBike} (${verdict.confidence}% confidence)`);
     
