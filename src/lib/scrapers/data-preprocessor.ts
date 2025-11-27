@@ -32,10 +32,19 @@ function preprocessBikeData(bikeData: any): any {
 
   // Take top 10 videos (optimal for speed/quality)
   const videos = sortedVideos.slice(0, 10).map((video: any) => {
-    // Smart truncation for description
-    const shortDescription = video.description 
-      ? truncateSmartly(video.description, 150)
+    // ENHANCED: Smart summarization for description/transcript
+    // Use intelligent summarization that extracts key information
+    const smartDescription = video.description 
+      ? smartSummarizeContent(video.description, 2500) // Increased from 150 to 2500
       : '';
+
+    // Handle transcript if available
+    const transcriptSummary = video.transcript
+      ? smartSummarizeContent(video.transcript, 3000) // Smart summarization for transcripts
+      : null;
+
+    // Include transcript key moments if available (already topic-extracted)
+    const keyMoments = video.transcriptKeyMoments || [];
 
     // Filter comments by quality (min 2 likes) and sort by likes
     const qualityComments = (video.comments || [])
@@ -45,18 +54,20 @@ function preprocessBikeData(bikeData: any): any {
     // Deduplicate similar comments
     const uniqueComments = deduplicateComments(qualityComments);
 
-    // Take top 15 unique, quality comments
+    // Take top 20 unique, quality comments (increased from 15)
     const topComments = uniqueComments
-      .slice(0, 15)
+      .slice(0, 20)
       .map((comment: any) => ({
         author: comment.author || 'Anonymous',
-        text: truncateSmartly(comment.text, 250),
+        text: truncateSmartly(comment.text, 300), // Increased from 250 to 300
         likeCount: comment.likeCount || 0
       }));
 
     return {
       title: video.title,
-      description: shortDescription,
+      description: smartDescription,
+      transcript: transcriptSummary,
+      transcriptKeyMoments: keyMoments,
       channelTitle: video.channelTitle,
       publishedAt: video.publishedAt,
       comments: topComments
@@ -170,6 +181,80 @@ function truncateSmartly(text: string, maxLength: number): string {
   }
   
   return truncated + '...';
+}
+
+/**
+ * Smart summarization that extracts the most valuable content
+ * Uses topic-based extraction and key sentence identification
+ */
+function smartSummarizeContent(text: string, maxLength: number): string {
+  if (!text || text.length <= maxLength) return text;
+  
+  // Topic keywords for motorcycle reviews (prioritize these)
+  const importantKeywords = [
+    // Performance & Engine
+    'engine', 'power', 'torque', 'performance', 'acceleration', 'pickup', 'refinement', 'vibration',
+    'bhp', 'rpm', 'cc', 'displacement', 'smoothness',
+    
+    // Ride Quality
+    'suspension', 'handling', 'ride quality', 'comfort', 'cornering', 'stability', 'braking',
+    'abs', 'front brake', 'rear brake', 'grip', 'ground clearance',
+    
+    // Practicality
+    'fuel economy', 'mileage', 'kmpl', 'fuel tank', 'range', 'pillion', 'seat', 'ergonomics',
+    'heat', 'temperature', 'traffic', 'commute', 'highway',
+    
+    // Build & Features
+    'build quality', 'fit and finish', 'paint', 'panel gaps', 'features', 'instrument cluster',
+    'digital display', 'bluetooth', 'navigation', 'service', 'maintenance', 'reliability',
+    
+    // Value & Ownership
+    'price', 'value', 'worth', 'cost', 'ownership', 'resale', 'insurance', 'emi',
+    'pros', 'cons', 'issues', 'problems', 'complaints', 'satisfaction'
+  ];
+  
+  // Split into sentences
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  
+  // Score each sentence based on keyword presence
+  const scoredSentences = sentences.map(sentence => {
+    const lowerSentence = sentence.toLowerCase();
+    const keywordCount = importantKeywords.filter(keyword => 
+      lowerSentence.includes(keyword.toLowerCase())
+    ).length;
+    
+    // Also prioritize sentences with numbers (specs, prices, mileage)
+    const hasNumbers = /\d+/.test(sentence);
+    const numberBonus = hasNumbers ? 2 : 0;
+    
+    return {
+      text: sentence.trim(),
+      score: keywordCount + numberBonus,
+      length: sentence.length
+    };
+  });
+  
+  // Sort by score (descending)
+  scoredSentences.sort((a, b) => b.score - a.score);
+  
+  // Build summary from highest-scoring sentences
+  let summary = '';
+  let currentLength = 0;
+  
+  for (const sentence of scoredSentences) {
+    if (currentLength + sentence.length + 1 <= maxLength) {
+      summary += sentence.text + ' ';
+      currentLength += sentence.length + 1;
+    }
+    if (currentLength >= maxLength * 0.9) break; // Close enough
+  }
+  
+  // If we got very little, fall back to truncateSmartly
+  if (summary.length < maxLength * 0.3) {
+    return truncateSmartly(text, maxLength);
+  }
+  
+  return summary.trim();
 }
 
 /**

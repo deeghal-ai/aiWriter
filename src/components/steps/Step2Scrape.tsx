@@ -468,7 +468,16 @@ function ScrapedDataView({
                                       Watch on YouTube →
                                     </a>
                                     {post.description && (
-                                      <p className="mt-2 text-slate-600">{post.description.substring(0, 200)}...</p>
+                                      <VideoDescriptionWithExpand description={post.description} />
+                                    )}
+                                    {post.transcript && (
+                                      <div className="mt-3 pt-3 border-t">
+                                        <p className="font-medium text-xs text-slate-500 mb-2">TRANSCRIPT:</p>
+                                        <VideoDescriptionWithExpand 
+                                          description={post.transcript} 
+                                          maxInitialLength={500}
+                                        />
+                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -571,7 +580,16 @@ function ScrapedDataView({
                                       Watch on YouTube →
                                     </a>
                                     {post.description && (
-                                      <p className="mt-2 text-slate-600">{post.description.substring(0, 200)}...</p>
+                                      <VideoDescriptionWithExpand description={post.description} />
+                                    )}
+                                    {post.transcript && (
+                                      <div className="mt-3 pt-3 border-t">
+                                        <p className="font-medium text-xs text-slate-500 mb-2">TRANSCRIPT:</p>
+                                        <VideoDescriptionWithExpand 
+                                          description={post.transcript} 
+                                          maxInitialLength={500}
+                                        />
+                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -626,5 +644,40 @@ function ScrapedDataView({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Component for expandable video description/transcript with smart load more
+function VideoDescriptionWithExpand({ 
+  description, 
+  maxInitialLength = 300 
+}: { 
+  description: string; 
+  maxInitialLength?: number;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  if (!description) return null;
+  
+  const needsTruncation = description.length > maxInitialLength;
+  const displayText = isExpanded || !needsTruncation 
+    ? description 
+    : description.substring(0, maxInitialLength);
+  
+  return (
+    <div className="mt-2">
+      <p className="text-slate-600 whitespace-pre-wrap">
+        {displayText}
+        {!isExpanded && needsTruncation && '...'}
+      </p>
+      {needsTruncation && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-xs text-blue-600 hover:underline mt-2 font-medium"
+        >
+          {isExpanded ? 'Show Less' : `Show More (${description.length - maxInitialLength} chars)`}
+        </button>
+      )}
+    </div>
   );
 }
