@@ -204,7 +204,7 @@ export function Step2Scrape() {
               <p className="text-sm text-slate-600">
                 Please check your internet connection and try again
               </p>
-              <Button onClick={retryScraping} variant="outline" size="sm" className="gap-2">
+              <Button onClick={restartScraping} variant="outline" size="sm" className="gap-2">
                 <RefreshCw className="h-4 w-4" />
                 Retry Scraping
               </Button>
