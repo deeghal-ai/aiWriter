@@ -57,9 +57,14 @@ export async function scrapeYouTubeForBike(
 
   console.log(`Found ${searchData.items?.length || 0} videos for ${bikeName}`);
 
-  // Step 2: Fetch comments for each video
+  // Step 2: Fetch full video details (for complete descriptions)
+  const videoIds = (searchData.items || []).map((item: any) => item.id.videoId);
+  const videoDetailsMap = await fetchVideoDetails(videoIds, apiKey);
+
+  // Step 3: Fetch comments for each video
   for (const item of searchData.items || []) {
     const videoId = item.id.videoId;
+    const videoDetails = videoDetailsMap[videoId];
     
     try {
       // Fetch video comments
@@ -78,10 +83,11 @@ export async function scrapeYouTubeForBike(
         // Continue with empty comments
         videos.push({
           videoId,
-          title: item.snippet.title,
-          description: item.snippet.description,
-          channelTitle: item.snippet.channelTitle,
-          publishedAt: item.snippet.publishedAt,
+          title: videoDetails?.title || item.snippet.title,
+          description: videoDetails?.description || item.snippet.description,
+          channelTitle: videoDetails?.channelTitle || item.snippet.channelTitle,
+          publishedAt: videoDetails?.publishedAt || item.snippet.publishedAt,
+          viewCount: videoDetails?.viewCount,
           comments: [],
         });
         continue;
@@ -101,10 +107,11 @@ export async function scrapeYouTubeForBike(
 
       videos.push({
         videoId,
-        title: item.snippet.title,
-        description: item.snippet.description,
-        channelTitle: item.snippet.channelTitle,
-        publishedAt: item.snippet.publishedAt,
+        title: videoDetails?.title || item.snippet.title,
+        description: videoDetails?.description || item.snippet.description,
+        channelTitle: videoDetails?.channelTitle || item.snippet.channelTitle,
+        publishedAt: videoDetails?.publishedAt || item.snippet.publishedAt,
+        viewCount: videoDetails?.viewCount,
         comments,
       });
 
@@ -194,6 +201,56 @@ export function formatYouTubeDataForAI(data: ScrapedYouTubeData): string {
   });
   
   return output;
+}
+
+/**
+ * Fetch full video details including complete descriptions
+ * YouTube search API only returns truncated snippets, so we need this
+ */
+async function fetchVideoDetails(
+  videoIds: string[],
+  apiKey: string
+): Promise<Record<string, { title: string; description: string; channelTitle: string; publishedAt: string; viewCount: string }>> {
+  if (videoIds.length === 0) return {};
+
+  const detailsMap: Record<string, any> = {};
+
+  // YouTube API allows up to 50 IDs per request
+  const batchSize = 50;
+  for (let i = 0; i < videoIds.length; i += batchSize) {
+    const batch = videoIds.slice(i, i + batchSize);
+    
+    const detailsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+    detailsUrl.searchParams.set('part', 'snippet,statistics');
+    detailsUrl.searchParams.set('id', batch.join(','));
+    detailsUrl.searchParams.set('key', apiKey);
+
+    try {
+      const response = await fetch(detailsUrl.toString());
+      
+      if (!response.ok) {
+        console.warn(`Failed to fetch video details: ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+
+      for (const item of data.items || []) {
+        detailsMap[item.id] = {
+          title: item.snippet.title,
+          description: item.snippet.description, // FULL description, not truncated!
+          channelTitle: item.snippet.channelTitle,
+          publishedAt: item.snippet.publishedAt,
+          viewCount: item.statistics?.viewCount || '0',
+        };
+      }
+    } catch (error) {
+      console.error(`Error fetching video details batch:`, error);
+    }
+  }
+
+  console.log(`Fetched full details for ${Object.keys(detailsMap).length} videos`);
+  return detailsMap;
 }
 
 /**

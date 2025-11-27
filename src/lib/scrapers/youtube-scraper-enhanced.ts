@@ -231,15 +231,21 @@ async function fetchVideoWithComments(
   apiKey: string,
   minCommentScore: number
 ): Promise<EnhancedYouTubeVideo> {
-  // Fetch video stats
+  // Fetch video stats AND full snippet (for complete description)
   const statsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-  statsUrl.searchParams.set('part', 'statistics');
+  statsUrl.searchParams.set('part', 'snippet,statistics'); // Get both snippet and statistics
   statsUrl.searchParams.set('id', videoId);
   statsUrl.searchParams.set('key', apiKey);
   
   const statsResponse = await fetch(statsUrl.toString());
   const statsData = await statsResponse.json();
-  const viewCount = parseInt(statsData.items?.[0]?.statistics?.viewCount || '0');
+  const videoData = statsData.items?.[0];
+  const viewCount = parseInt(videoData?.statistics?.viewCount || '0');
+  
+  // Use full description from video details API (not truncated search snippet)
+  const fullDescription = videoData?.snippet?.description || basicInfo.description;
+  const fullTitle = videoData?.snippet?.title || basicInfo.title;
+  const fullChannelTitle = videoData?.snippet?.channelTitle || basicInfo.channelTitle;
   
   // Fetch comments
   const commentsUrl = new URL('https://www.googleapis.com/youtube/v3/commentThreads');
@@ -274,14 +280,14 @@ async function fetchVideoWithComments(
     excludeSpam: true
   });
   
-  const trustScore = getChannelTrustScore(basicInfo.channelTitle);
-  const trusted = isTrustedChannel(basicInfo.channelTitle);
+  const trustScore = getChannelTrustScore(fullChannelTitle);
+  const trusted = isTrustedChannel(fullChannelTitle);
   
   return {
     videoId,
-    title: basicInfo.title,
-    description: basicInfo.description.substring(0, 300),
-    channelTitle: basicInfo.channelTitle,
+    title: fullTitle,
+    description: fullDescription, // FULL description from videos API, NOT truncated!
+    channelTitle: fullChannelTitle,
     publishedAt: basicInfo.publishedAt,
     viewCount,
     trustScore,

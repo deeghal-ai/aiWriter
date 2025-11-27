@@ -268,6 +268,28 @@ export async function POST(request: NextRequest) {
 
 // Helper functions
 
+/**
+ * Clean JSON response from AI that might be wrapped in markdown code blocks
+ */
+function cleanJsonResponse(text: string): string {
+  // Remove markdown code blocks if present
+  let cleaned = text.trim();
+  
+  // Remove ```json ... ``` or ``` ... ```
+  if (cleaned.startsWith('```')) {
+    // Find the first newline after opening ```
+    const firstNewline = cleaned.indexOf('\n');
+    // Find the closing ```
+    const lastBackticks = cleaned.lastIndexOf('```');
+    
+    if (firstNewline !== -1 && lastBackticks !== -1 && lastBackticks > firstNewline) {
+      cleaned = cleaned.substring(firstNewline + 1, lastBackticks).trim();
+    }
+  }
+  
+  return cleaned;
+}
+
 async function generateNarrativePlan(
   client: Anthropic,
   bike1Name: string,
@@ -296,7 +318,8 @@ async function generateNarrativePlan(
     throw new Error('Unexpected response type from AI');
   }
 
-  return JSON.parse(content.text);
+  const cleanedJson = cleanJsonResponse(content.text);
+  return JSON.parse(cleanedJson);
 }
 
 async function generateSection(
@@ -403,7 +426,8 @@ async function runCoherencePass(
     throw new Error('Unexpected response type from AI');
   }
 
-  return JSON.parse(content.text);
+  const cleanedJson = cleanJsonResponse(content.text);
+  return JSON.parse(cleanedJson);
 }
 
 function getMajorityWinner(verdicts: VerdictGenerationResult): string {
