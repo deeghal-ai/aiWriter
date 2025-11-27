@@ -23,21 +23,35 @@ function preprocessBikeData(bikeData: any): any {
     return bikeData;
   }
 
-  // Take top 15 videos instead of all 20
-  const videos = bikeData.videos.slice(0, 15).map((video: any) => {
-    // Limit description to 200 characters
+  // Sort videos by engagement (comments count + likes)
+  const sortedVideos = [...bikeData.videos].sort((a: any, b: any) => {
+    const engagementA = (a.comments?.length || 0) * 10 + (a.viewCount || 0);
+    const engagementB = (b.comments?.length || 0) * 10 + (b.viewCount || 0);
+    return engagementB - engagementA;
+  });
+
+  // Take top 10 videos (optimal for speed/quality)
+  const videos = sortedVideos.slice(0, 10).map((video: any) => {
+    // Smart truncation for description
     const shortDescription = video.description 
-      ? video.description.substring(0, 200) + '...'
+      ? truncateSmartly(video.description, 150)
       : '';
 
-    // Take top 20 comments sorted by likes (most relevant)
-    const topComments = (video.comments || [])
-      .sort((a: any, b: any) => (b.likeCount || 0) - (a.likeCount || 0))
-      .slice(0, 20)
+    // Filter comments by quality (min 2 likes) and sort by likes
+    const qualityComments = (video.comments || [])
+      .filter((c: any) => (c.likeCount || 0) >= 2)
+      .sort((a: any, b: any) => (b.likeCount || 0) - (a.likeCount || 0));
+
+    // Deduplicate similar comments
+    const uniqueComments = deduplicateComments(qualityComments);
+
+    // Take top 15 unique, quality comments
+    const topComments = uniqueComments
+      .slice(0, 15)
       .map((comment: any) => ({
-        author: comment.author,
-        text: comment.text.substring(0, 300), // Limit comment length
-        likeCount: comment.likeCount
+        author: comment.author || 'Anonymous',
+        text: truncateSmartly(comment.text, 250),
+        likeCount: comment.likeCount || 0
       }));
 
     return {
@@ -137,12 +151,68 @@ export function preprocessScrapedData(data: any, dataType?: 'reddit' | 'youtube'
 }
 
 /**
+ * Smart truncation that preserves sentence boundaries
+ */
+function truncateSmartly(text: string, maxLength: number): string {
+  if (!text || text.length <= maxLength) return text;
+  
+  // Find last sentence boundary before maxLength
+  const truncated = text.substring(0, maxLength);
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastExclaim = truncated.lastIndexOf('!');
+  const lastQuestion = truncated.lastIndexOf('?');
+  
+  const lastBoundary = Math.max(lastPeriod, lastExclaim, lastQuestion);
+  
+  // Use sentence boundary if it's not too far back
+  if (lastBoundary > maxLength * 0.5) {
+    return text.substring(0, lastBoundary + 1);
+  }
+  
+  return truncated + '...';
+}
+
+/**
+ * Remove comments that are >70% similar
+ */
+function deduplicateComments(comments: any[]): any[] {
+  const unique: any[] = [];
+  
+  for (const comment of comments) {
+    const isDuplicate = unique.some(existing => 
+      calculateSimilarity(existing.text, comment.text) > 0.7
+    );
+    
+    if (!isDuplicate) {
+      unique.push(comment);
+    }
+  }
+  
+  return unique;
+}
+
+/**
+ * Simple Jaccard similarity for text
+ */
+function calculateSimilarity(text1: string, text2: string): number {
+  if (!text1 || !text2) return 0;
+  
+  const words1 = new Set(text1.toLowerCase().split(/\s+/));
+  const words2 = new Set(text2.toLowerCase().split(/\s+/));
+  
+  const intersection = new Set([...words1].filter(w => words2.has(w)));
+  const union = new Set([...words1, ...words2]);
+  
+  return union.size > 0 ? intersection.size / union.size : 0;
+}
+
+/**
  * Estimate token count (rough approximation)
- * 1 token ≈ 4 characters for English text
+ * 1 token ≈ 3.5 characters for mixed content (more accurate)
  */
 export function estimateTokenCount(data: any): number {
   const jsonString = JSON.stringify(data);
-  return Math.ceil(jsonString.length / 4);
+  return Math.ceil(jsonString.length / 3.5);
 }
 
 /**

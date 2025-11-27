@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractInsightsWithRetry } from "@/lib/ai/factory";
+import { extractInsightsWithRetry, extractInsightsOptimized } from "@/lib/ai/factory";
 import { validateInsights, checkInsightQuality } from "@/utils/validation";
 import { preprocessScrapedData, estimateTokenCount } from "@/lib/scrapers/data-preprocessor";
 import type { InsightExtractionResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // 120 seconds (2 minutes)
+export const maxDuration = 300; // 300 seconds (5 minutes) - needed for Claude API calls with retries
 
 interface InsightExtractionRequest {
   bike1Name: string;
@@ -77,13 +77,18 @@ export async function POST(request: NextRequest) {
       console.log(`[API] Reddit data: ${originalTokens} tokens → ${processedTokens} tokens (reduced by ${Math.round((1 - processedTokens/originalTokens) * 100)}%)`);
     }
     
-    // Extract insights with retry
-    // Pass YouTube data as redditData if Reddit is not available
-    const insights = await extractInsightsWithRetry(
+    // Use optimized extraction with parallel processing and Haiku model
+    // Pass combined processed data
+    const combinedData = {
+      bike1: processedYouTubeData?.bike1 || processedRedditData?.bike1,
+      bike2: processedYouTubeData?.bike2 || processedRedditData?.bike2
+    };
+    
+    console.log('[API] Using optimized parallel extraction (Haiku model)');
+    const insights = await extractInsightsOptimized(
       body.bike1Name,
       body.bike2Name,
-      processedRedditData || processedYouTubeData,
-      processedXbhpData
+      combinedData
     );
     
     // Validate results

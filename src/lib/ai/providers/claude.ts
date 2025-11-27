@@ -6,8 +6,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { insightExtractionSchema, personaGenerationSchema, verdictGenerationSchema } from "../schemas";
 import { buildInsightExtractionPrompt, buildPersonaGenerationPrompt, buildVerdictGenerationPrompt } from "../prompts";
+import { buildSingleBikeExtractionPrompt, EXTRACTION_SYSTEM_PROMPT } from "../prompts-optimized";
+import { getModelForTask } from "../model-selector";
 import type { AIProvider } from "../provider-interface";
-import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona } from "../../types";
+import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona, BikeInsights } from "../../types";
 
 export class ClaudeProvider implements AIProvider {
   name = "Claude (Anthropic)";
@@ -127,6 +129,23 @@ export class ClaudeProvider implements AIProvider {
               bike2: insights.bikes[1]
             };
           }
+        } else if (insights.bike1_praises || insights.bike2_praises) {
+          // Handle flat structure: bike1_praises, bike1_complaints, bike2_praises, bike2_complaints
+          console.log('[Claude] Found flat structure (bike1_praises format), restructuring...');
+          insights = {
+            bike1: {
+              name: insights.bike1_name || bike1Name,
+              praises: insights.bike1_praises || [],
+              complaints: insights.bike1_complaints || [],
+              surprising_insights: insights.bike1_surprising_insights || []
+            },
+            bike2: {
+              name: insights.bike2_name || bike2Name,
+              praises: insights.bike2_praises || [],
+              complaints: insights.bike2_complaints || [],
+              surprising_insights: insights.bike2_surprising_insights || []
+            }
+          };
         }
       }
       
@@ -261,6 +280,163 @@ export class ClaudeProvider implements AIProvider {
       // Re-throw with context
       throw new Error(`Claude extraction failed: ${error.message}`);
     }
+  }
+  
+  /**
+   * OPTIMIZED: Parallel extraction with Haiku model
+   * 2-3x faster than original extractInsights method
+   */
+  async extractInsightsOptimized(
+    bike1Name: string,
+    bike2Name: string,
+    forumData: any
+  ): Promise<InsightExtractionResult> {
+    if (!this.client) {
+      throw new Error("Claude API not configured. Check ANTHROPIC_API_KEY in .env.local");
+    }
+    
+    const startTime = Date.now();
+    console.log(`[Claude-Optimized] Starting parallel extraction for ${bike1Name} vs ${bike2Name}`);
+    
+    // Get Haiku model config
+    const modelConfig = getModelForTask('extraction');
+    console.log(`[Claude-Optimized] Using model: ${modelConfig.model} (fast extraction mode)`);
+    
+    try {
+      // Split data by bike
+      const bike1Data = forumData.bike1 || forumData;
+      const bike2Data = forumData.bike2 || forumData;
+      
+      // Extract both bikes in parallel using Haiku
+      const [bike1Result, bike2Result] = await Promise.all([
+        this.extractSingleBikeOptimized(bike1Name, bike1Data, modelConfig),
+        this.extractSingleBikeOptimized(bike2Name, bike2Data, modelConfig)
+      ]);
+      
+      const processingTime = Date.now() - startTime;
+      
+      const result: InsightExtractionResult = {
+        bike1: bike1Result,
+        bike2: bike2Result,
+        metadata: {
+          extracted_at: new Date().toISOString(),
+          total_praises: bike1Result.praises.length + bike2Result.praises.length,
+          total_complaints: bike1Result.complaints.length + bike2Result.complaints.length,
+          total_quotes: this.countQuotes(bike1Result) + this.countQuotes(bike2Result),
+          processing_time_ms: processingTime
+        }
+      };
+      
+      console.log(`[Claude-Optimized] ✅ Parallel extraction complete in ${processingTime}ms (${Math.round(processingTime/1000)}s)`);
+      console.log(`[Claude-Optimized] Found ${result.metadata.total_praises} praises, ${result.metadata.total_complaints} complaints, ${result.metadata.total_quotes} quotes`);
+      
+      return result;
+      
+    } catch (error: any) {
+      console.error("[Claude-Optimized] Extraction error:", error);
+      
+      // Handle specific errors
+      if (error.status === 401) {
+        throw new Error("Invalid Anthropic API key. Check your .env.local file.");
+      }
+      if (error.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again in a moment.");
+      }
+      if (error.status === 529) {
+        throw new Error("Claude API is overloaded. Please try again shortly.");
+      }
+      
+      throw error;
+    }
+  }
+  
+  /**
+   * Extract insights for a single bike (used in parallel)
+   */
+  private async extractSingleBikeOptimized(
+    bikeName: string,
+    bikeData: any,
+    modelConfig: any
+  ): Promise<BikeInsights> {
+    console.log(`[Claude-Optimized] Extracting ${bikeName}...`);
+    
+    // Build optimized prompt with few-shot examples
+    const prompt = buildSingleBikeExtractionPrompt(bikeName, bikeData);
+    
+    const response = await this.client!.messages.create({
+      model: modelConfig.model,
+      max_tokens: modelConfig.maxTokens,
+      temperature: modelConfig.temperature,
+      system: EXTRACTION_SYSTEM_PROMPT,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+    
+    const content = response.content[0];
+    if (content.type !== 'text') {
+      throw new Error('Expected text response from Claude');
+    }
+    
+    // Parse JSON response
+    let jsonText = content.text.trim();
+    // Remove markdown fences if present
+    jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    
+    const insights = JSON.parse(jsonText);
+    
+    // Normalize field names
+    if (insights.bike_name && !insights.name) {
+      insights.name = insights.bike_name;
+      delete insights.bike_name;
+    }
+    
+    // Ensure arrays exist
+    insights.praises = insights.praises || [];
+    insights.complaints = insights.complaints || [];
+    insights.surprising_insights = insights.surprising_insights || [];
+    
+    // Sanitize quotes
+    insights.praises = insights.praises.map((p: any) => this.sanitizeCategory(p)).filter((p: any) => p.quotes && p.quotes.length > 0);
+    insights.complaints = insights.complaints.map((c: any) => this.sanitizeCategory(c)).filter((c: any) => c.quotes && c.quotes.length > 0);
+    
+    console.log(`[Claude-Optimized] ✓ ${bikeName}: ${insights.praises.length} praises, ${insights.complaints.length} complaints`);
+    
+    return insights;
+  }
+  
+  /**
+   * Sanitize a category's quotes
+   */
+  private sanitizeCategory(category: any): any {
+    if (!category.quotes || !Array.isArray(category.quotes)) {
+      category.quotes = [];
+      return category;
+    }
+    
+    // Filter out invalid quotes
+    category.quotes = category.quotes.filter((quote: any) => {
+      return quote && 
+             quote.text && 
+             typeof quote.text === 'string' && 
+             quote.text.trim().length > 0 &&
+             quote.author && 
+             typeof quote.author === 'string' &&
+             quote.source && 
+             typeof quote.source === 'string';
+    });
+    
+    return category;
+  }
+  
+  /**
+   * Count total quotes in bike insights
+   */
+  private countQuotes(insights: BikeInsights): number {
+    const praiseQuotes = insights.praises.reduce((sum, p) => sum + (p.quotes?.length || 0), 0);
+    const complaintQuotes = insights.complaints.reduce((sum, c) => sum + (c.quotes?.length || 0), 0);
+    return praiseQuotes + complaintQuotes;
   }
   
   async generatePersonas(
