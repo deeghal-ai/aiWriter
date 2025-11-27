@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generatePersonasWithRetry } from "@/lib/ai/factory";
+import { generatePersonasWithRetry, generatePersonasOptimized } from "@/lib/ai/factory";
 import { validatePersonas, checkPersonaQuality } from "@/utils/validation";
 import type { PersonaGenerationResponse, InsightExtractionResult } from "@/lib/types";
 
@@ -49,10 +49,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log(`[API] Starting persona generation for ${body.bike1Name} vs ${body.bike2Name}`);
+    console.log(`[API] Starting OPTIMIZED persona generation for ${body.bike1Name} vs ${body.bike2Name}`);
     
-    // Generate personas with retry
-    const result = await generatePersonasWithRetry(
+    // Generate personas with optimized method (condensed inputs, better prompts)
+    const result = await generatePersonasOptimized(
       body.bike1Name,
       body.bike2Name,
       body.insights

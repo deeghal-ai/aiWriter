@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateVerdictsWithRetry } from "@/lib/ai/factory";
+import { generateVerdictsWithRetry, generateVerdictsOptimized } from "@/lib/ai/factory";
 import { validateVerdicts, checkVerdictQuality } from "@/utils/validation";
 import type { 
   VerdictGenerationResponse, 
@@ -64,11 +64,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log(`[API] Starting verdict generation for ${body.bike1Name} vs ${body.bike2Name}`);
-    console.log(`[API] Generating verdicts for ${body.personas.personas.length} personas`);
+    console.log(`[API] Starting OPTIMIZED verdict generation for ${body.bike1Name} vs ${body.bike2Name}`);
+    console.log(`[API] Generating ${body.personas.personas.length} verdicts in PARALLEL`);
     
-    // Generate verdicts with retry
-    const result = await generateVerdictsWithRetry(
+    // Generate verdicts with optimized parallel processing (one API call per persona)
+    const result = await generateVerdictsOptimized(
       body.bike1Name,
       body.bike2Name,
       body.personas.personas,
