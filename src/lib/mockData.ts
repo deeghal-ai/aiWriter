@@ -143,117 +143,49 @@ export const mockInsights = {
   }
 };
 
-export const mockPersonas: Persona[] = [
-  {
-    id: 'persona-1',
-    title: 'The Pillion-Heavy Commuter',
-    percentage: 34,
-    pattern: {
-      cityCommute: 70,
-      highway: 20,
-      leisure: 10,
-      offroad: 0
-    },
-    demographics: {
-      ageRange: '28-35',
-      location: 'Mumbai, Bangalore (metro cities)',
-      occupation: 'IT professionals, married'
-    },
-    priorities: [
-      'Pillion comfort',
-      'Traffic visibility',
-      'Fuel economy'
-    ],
-    quote: 'Wife rides 70% of time, zero complaints',
-    sampleSize: 15
-  },
-  {
-    id: 'persona-2',
-    title: 'The Weekend Thump Chaser',
-    percentage: 28,
-    pattern: {
-      cityCommute: 80,
-      highway: 15,
-      leisure: 5,
-      offroad: 0
-    },
-    demographics: {
-      ageRange: '35-45',
-      location: 'Tier-1 cities',
-      occupation: 'Professionals, nostalgic riders'
-    },
-    priorities: [
-      'Exhaust note',
-      'Simplicity',
-      'Experience over speed'
-    ],
-    quote: 'Cruising at 50-70 kmph with that bassy thump',
-    sampleSize: 12
-  },
-  {
-    id: 'persona-3',
-    title: 'The First Big Bike Buyer',
-    percentage: 23,
-    pattern: {
-      cityCommute: 60,
-      highway: 30,
-      leisure: 10,
-      offroad: 0
-    },
-    demographics: {
-      ageRange: '25-30',
-      location: 'Pune, Hyderabad',
-      occupation: 'Young professionals'
-    },
-    priorities: [
-      'Modern features',
-      'Confidence-building',
-      'Resale value'
-    ],
-    quote: 'First big bike, want something reliable',
-    sampleSize: 10
-  }
-];
+// Mock personas removed - using real AI-generated personas from Step 4
+// The Persona interface has been updated and these mocks are outdated
 
-export const mockVerdicts: Verdict[] = [
-  {
-    personaId: 'persona-1',
-    recommendedBike: 'Classic 350',
-    confidence: 90,
-    reasoning: [
-      'Dual-seat comfort confirmed by 12 pillion riders',
-      'LED visibility crucial for city traffic safety',
-      'Better resale value (23% higher after 3 years)'
-    ],
-    againstReasons: [
-      'If Bullet purist (exhaust note priority)',
-      'If ₹20k price gap matters more than features'
-    ],
-    evidence: [
-      '15 owners in this category chose Classic',
-      '3 chose Bullet, later regretted pillion comfort',
-      'Average rating: Classic 4.6/5, Bullet 3.8/5'
-    ]
-  },
-  {
-    personaId: 'persona-2',
-    recommendedBike: 'Bullet 350',
-    confidence: 85,
-    reasoning: [
-      'Exhaust note matters more than feature list',
-      '₹20k savings funds accessories and services',
-      'Intentional simplicity is the appeal'
-    ],
-    againstReasons: [
-      'If monthly 200km+ highway rides planned',
-      'If riding group has modern bikes (Speed 400, CB350)'
-    ],
-    evidence: [
-      '12 owners prioritized "experience" over performance',
-      'Exhaust note mentioned in 20+ reviews'
-    ]
-  }
-];
+// Mock verdicts removed - using real AI-generated verdicts from Step 5
+// export const mockVerdicts: Verdict[] = [
+//   {
+//     personaId: 'persona-1',
+//     recommendedBike: 'Classic 350',
+//     confidence: 90,
+//     reasoning: [
+//       'Dual-seat comfort confirmed by 12 pillion riders',
+//       'LED visibility crucial for city traffic safety',
+//       'Better resale value (23% higher after 3 years)'
+//     ],
+//     againstReasons: [
+//       'If Bullet purist (exhaust note priority)',
+//       'If ₹20k price gap matters more than features'
+//     ],
+//     evidence: [
+//       '15 owners in this category chose Classic',
+//       '3 chose Bullet, later regretted pillion comfort',
+//       'Average rating: Classic 4.6/5, Bullet 3.8/5'
+//     ]
+//   },
+//   {
+//     personaId: 'persona-2',
+//     recommendedBike: 'Bullet 350',
+//     confidence: 85,
+//     reasoning: [
+//       'Exhaust note matters more than feature list',
+//       '₹20k savings funds accessories and services',
+//       'Intentional simplicity is the appeal'
+//     ],
+//     againstReasons: [
+//       'If monthly 200km+ highway rides planned',
+//       'If riding group has modern bikes (Speed 400, CB350)'
+//     ],
+//     evidence: [
+//       '12 owners prioritized "experience" over performance',
+//       'Exhaust note mentioned in 20+ reviews'
+//     ]
+//   }
+// ];
 
 export const mockArticleSections: ArticleSection[] = [
   {
