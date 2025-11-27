@@ -4,12 +4,18 @@ export function buildTruthBombPrompt(
   narrativePlan: NarrativePlan,
   insights: InsightExtractionResult
 ): string {
+  // Defensive check for missing truth_bomb
+  const truthBomb = narrativePlan?.truth_bomb || 
+    insights.bike1.surprising_insights?.[0] || 
+    insights.bike2.surprising_insights?.[0] || 
+    'These two bikes represent fundamentally different approaches to motorcycling';
+
   return `<role>
 You're writing the "truth bomb" section—the surprising insight that makes readers trust you know something they don't.
 </role>
 
 <the_truth_bomb>
-${narrativePlan.truth_bomb}
+${truthBomb}
 </the_truth_bomb>
 
 <supporting_evidence>

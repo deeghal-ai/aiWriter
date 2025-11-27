@@ -319,7 +319,33 @@ async function generateNarrativePlan(
   }
 
   const cleanedJson = cleanJsonResponse(content.text);
-  return JSON.parse(cleanedJson);
+  
+  try {
+    const parsed = JSON.parse(cleanedJson);
+    
+    // Validate required fields
+    if (!parsed.story_angle || !parsed.hook_strategy || !parsed.matrix_focus_areas) {
+      console.error('[Article] Invalid narrative plan structure:', parsed);
+      throw new Error('Narrative plan missing required fields');
+    }
+    
+    // Add defaults for optional fields
+    return {
+      story_angle: parsed.story_angle,
+      hook_strategy: parsed.hook_strategy,
+      hook_elements: parsed.hook_elements || { scenario: '', tension: '', promise: '' },
+      truth_bomb: parsed.truth_bomb || insights.bike1.surprising_insights?.[0] || 'Key insight from analysis',
+      quote_allocation: parsed.quote_allocation || { hook: [], matrix_engine: [], matrix_comfort: [], matrix_ownership: [], verdict: [] },
+      tension_points: parsed.tension_points || [],
+      matrix_focus_areas: parsed.matrix_focus_areas || ['Engine Character', 'Comfort', 'Value'],
+      contrarian_angle: parsed.contrarian_angle || { target_persona: '', why_they_might_hate_winner: '' },
+      closing_insight: parsed.closing_insight || 'Final thoughts',
+      callbacks: parsed.callbacks || [],
+    };
+  } catch (error) {
+    console.error('[Article] Failed to parse narrative plan:', cleanedJson);
+    throw new Error(`Failed to parse narrative plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 async function generateSection(

@@ -6,15 +6,23 @@ export function buildHookPrompt(
   narrativePlan: NarrativePlan,
   insights: InsightExtractionResult
 ): string {
+  // Defensive checks with fallbacks
+  const hookStrategy = narrativePlan?.hook_strategy || 'Unexpected Truth';
+  const hookElements = narrativePlan?.hook_elements || {
+    scenario: `Comparing ${bike1Name} and ${bike2Name}`,
+    tension: 'Which bike is the smarter choice?',
+    promise: 'We analyzed real owner experiences to find out'
+  };
+
   return `<role>
 You are writing the opening hook of a motorcycle comparison article. You have 150-200 words to make readers NEED to continue reading.
 </role>
 
 <strategy>
-Hook type: ${narrativePlan.hook_strategy}
-Scenario: ${narrativePlan.hook_elements.scenario}
-Tension: ${narrativePlan.hook_elements.tension}
-Promise: ${narrativePlan.hook_elements.promise}
+Hook type: ${hookStrategy}
+Scenario: ${hookElements.scenario}
+Tension: ${hookElements.tension}
+Promise: ${hookElements.promise}
 </strategy>
 
 <bikes>

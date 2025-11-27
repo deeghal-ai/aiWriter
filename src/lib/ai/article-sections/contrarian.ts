@@ -10,6 +10,12 @@ export function buildContrarianPrompt(
     .flatMap(v => v.againstReasons)
     .join('\n• ');
 
+  // Defensive checks with fallbacks
+  const contrarianAngle = narrativePlan?.contrarian_angle || {
+    target_persona: 'some riders',
+    why_they_might_hate_winner: 'specific use cases where the other bike excels'
+  };
+
   return `<role>
 You're writing the "Why You Might Hate the Winner" section. This is where you build TRUST by being honest about the recommended bike's flaws.
 </role>
@@ -18,8 +24,8 @@ You're writing the "Why You Might Hate the Winner" section. This is where you bu
 <losing_bike>${losingBike}</losing_bike>
 
 <contrarian_angle>
-Target persona: ${narrativePlan.contrarian_angle.target_persona}
-Why they might hate it: ${narrativePlan.contrarian_angle.why_they_might_hate_winner}
+Target persona: ${contrarianAngle.target_persona}
+Why they might hate it: ${contrarianAngle.why_they_might_hate_winner}
 </contrarian_angle>
 
 <against_reasons_from_verdicts>
