@@ -63,6 +63,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate insights structure - this is critical!
+    if (!body.insights.bike1 || !body.insights.bike2) {
+      console.error('[Article] Invalid insights structure:', JSON.stringify(body.insights, null, 2).substring(0, 500));
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid insights structure - missing bike1 or bike2 data',
+          details: 'Please re-run extraction in Step 3.',
+        } as ArticleGenerationResponse,
+        { status: 400 }
+      );
+    }
+
+    // Ensure required arrays exist with defaults
+    if (!body.insights.bike1.praises) body.insights.bike1.praises = [];
+    if (!body.insights.bike1.complaints) body.insights.bike1.complaints = [];
+    if (!body.insights.bike1.surprising_insights) body.insights.bike1.surprising_insights = [];
+    if (!body.insights.bike2.praises) body.insights.bike2.praises = [];
+    if (!body.insights.bike2.complaints) body.insights.bike2.complaints = [];
+    if (!body.insights.bike2.surprising_insights) body.insights.bike2.surprising_insights = [];
+
     // Check API key
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -334,7 +355,7 @@ async function generateNarrativePlan(
       story_angle: parsed.story_angle,
       hook_strategy: parsed.hook_strategy,
       hook_elements: parsed.hook_elements || { scenario: '', tension: '', promise: '' },
-      truth_bomb: parsed.truth_bomb || insights.bike1.surprising_insights?.[0] || 'Key insight from analysis',
+      truth_bomb: parsed.truth_bomb || insights.bike1?.surprising_insights?.[0] || insights.bike2?.surprising_insights?.[0] || 'Key insight from analysis',
       quote_allocation: parsed.quote_allocation || { hook: [], matrix_engine: [], matrix_comfort: [], matrix_ownership: [], verdict: [] },
       tension_points: parsed.tension_points || [],
       matrix_focus_areas: parsed.matrix_focus_areas || ['Engine Character', 'Comfort', 'Value'],

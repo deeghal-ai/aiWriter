@@ -57,8 +57,18 @@ export async function POST(request: NextRequest) {
     
     // Step 1: Prepare data for both bikes (smart filtering, deduplication)
     const dataSource = youtubeData || redditData;
-    const bike1Prepared = prepareBikeDataForSonnet(dataSource.bike1 || dataSource, bike1Name);
-    const bike2Prepared = prepareBikeDataForSonnet(dataSource.bike2 || dataSource, bike2Name);
+    
+    // Debug log the data source structure
+    console.log(`[Sonnet] Data source keys:`, dataSource ? Object.keys(dataSource) : 'null');
+    console.log(`[Sonnet] Has bike1:`, !!dataSource?.bike1);
+    console.log(`[Sonnet] Has bike2:`, !!dataSource?.bike2);
+    
+    // Handle both structured (bike1/bike2) and flat data formats
+    const bike1Data = dataSource?.bike1 || dataSource;
+    const bike2Data = dataSource?.bike2 || dataSource;
+    
+    const bike1Prepared = prepareBikeDataForSonnet(bike1Data, bike1Name);
+    const bike2Prepared = prepareBikeDataForSonnet(bike2Data, bike2Name);
     
     console.log(`[Sonnet] Data prepared:
       ${bike1Name}: ${bike1Prepared.qualityComments} quality comments from ${bike1Prepared.videoCount} videos

@@ -4,11 +4,15 @@ export function buildTruthBombPrompt(
   narrativePlan: NarrativePlan,
   insights: InsightExtractionResult
 ): string {
-  // Defensive check for missing truth_bomb
+  // Defensive check for missing truth_bomb - use optional chaining throughout
   const truthBomb = narrativePlan?.truth_bomb || 
-    insights.bike1.surprising_insights?.[0] || 
-    insights.bike2.surprising_insights?.[0] || 
+    insights?.bike1?.surprising_insights?.[0] || 
+    insights?.bike2?.surprising_insights?.[0] || 
     'These two bikes represent fundamentally different approaches to motorcycling';
+
+  // Safely get surprising insights with defaults
+  const bike1Surprises = insights?.bike1?.surprising_insights || [];
+  const bike2Surprises = insights?.bike2?.surprising_insights || [];
 
   return `<role>
 You're writing the "truth bomb" section—the surprising insight that makes readers trust you know something they don't.
@@ -19,8 +23,8 @@ ${truthBomb}
 </the_truth_bomb>
 
 <supporting_evidence>
-${JSON.stringify(insights.bike1.surprising_insights)}
-${JSON.stringify(insights.bike2.surprising_insights)}
+${JSON.stringify(bike1Surprises)}
+${JSON.stringify(bike2Surprises)}
 </supporting_evidence>
 
 <requirements>

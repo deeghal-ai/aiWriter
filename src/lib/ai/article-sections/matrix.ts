@@ -15,25 +15,31 @@ export function buildMatrixPrompt(
 ): string {
   const focusKeyword = focusArea.toLowerCase().split(' ')[0];
   
-  const bike1Praises = insights.bike1.praises
+  // Safely access bike1 data with defaults
+  const bike1PraisesArr = insights?.bike1?.praises || [];
+  const bike1ComplaintsArr = insights?.bike1?.complaints || [];
+  const bike2PraisesArr = insights?.bike2?.praises || [];
+  const bike2ComplaintsArr = insights?.bike2?.complaints || [];
+  
+  const bike1Praises = bike1PraisesArr
     .filter(p => p.category.toLowerCase().includes(focusKeyword))
-    .map(p => `• ${p.category} (${p.frequency} mentions): "${p.quotes[0]?.text}"`)
-    .join('\n');
+    .map(p => `• ${p.category} (${p.frequency} mentions): "${p.quotes[0]?.text || 'No quote'}"`)
+    .join('\n') || 'No relevant praises found';
     
-  const bike1Complaints = insights.bike1.complaints
+  const bike1Complaints = bike1ComplaintsArr
     .filter(c => c.category.toLowerCase().includes(focusKeyword))
-    .map(c => `• ${c.category} (${c.frequency} mentions): "${c.quotes[0]?.text}"`)
-    .join('\n');
+    .map(c => `• ${c.category} (${c.frequency} mentions): "${c.quotes[0]?.text || 'No quote'}"`)
+    .join('\n') || 'No relevant complaints found';
     
-  const bike2Praises = insights.bike2.praises
+  const bike2Praises = bike2PraisesArr
     .filter(p => p.category.toLowerCase().includes(focusKeyword))
-    .map(p => `• ${p.category} (${p.frequency} mentions): "${p.quotes[0]?.text}"`)
-    .join('\n');
+    .map(p => `• ${p.category} (${p.frequency} mentions): "${p.quotes[0]?.text || 'No quote'}"`)
+    .join('\n') || 'No relevant praises found';
     
-  const bike2Complaints = insights.bike2.complaints
+  const bike2Complaints = bike2ComplaintsArr
     .filter(c => c.category.toLowerCase().includes(focusKeyword))
-    .map(c => `• ${c.category} (${c.frequency} mentions): "${c.quotes[0]?.text}"`)
-    .join('\n');
+    .map(c => `• ${c.category} (${c.frequency} mentions): "${c.quotes[0]?.text || 'No quote'}"`)
+    .join('\n') || 'No relevant complaints found';
     
   const relevantPersonas = personas.personas
     .filter(p => 

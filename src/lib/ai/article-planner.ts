@@ -22,13 +22,13 @@ Bike 2: ${bike2Name}
 </bikes>
 
 <insights_summary>
-${bike1Name} - Top Praises: ${insights.bike1.praises.slice(0, 5).map(p => p.category).join(', ')}
-${bike1Name} - Top Complaints: ${insights.bike1.complaints.slice(0, 3).map(c => c.category).join(', ')}
-${bike1Name} - Surprising: ${insights.bike1.surprising_insights?.[0] || 'None identified'}
+${bike1Name} - Top Praises: ${(insights.bike1?.praises || []).slice(0, 5).map(p => p.category).join(', ') || 'No praises found'}
+${bike1Name} - Top Complaints: ${(insights.bike1?.complaints || []).slice(0, 3).map(c => c.category).join(', ') || 'No complaints found'}
+${bike1Name} - Surprising: ${insights.bike1?.surprising_insights?.[0] || 'None identified'}
 
-${bike2Name} - Top Praises: ${insights.bike2.praises.slice(0, 5).map(p => p.category).join(', ')}
-${bike2Name} - Top Complaints: ${insights.bike2.complaints.slice(0, 3).map(c => c.category).join(', ')}
-${bike2Name} - Surprising: ${insights.bike2.surprising_insights?.[0] || 'None identified'}
+${bike2Name} - Top Praises: ${(insights.bike2?.praises || []).slice(0, 5).map(p => p.category).join(', ') || 'No praises found'}
+${bike2Name} - Top Complaints: ${(insights.bike2?.complaints || []).slice(0, 3).map(c => c.category).join(', ') || 'No complaints found'}
+${bike2Name} - Surprising: ${insights.bike2?.surprising_insights?.[0] || 'None identified'}
 </insights_summary>
 
 <personas>

@@ -53,6 +53,25 @@ export async function POST(request: NextRequest) {
           return;
         }
 
+        // Validate insights structure - this is critical!
+        if (!body.insights.bike1 || !body.insights.bike2) {
+          console.error('[Article Streaming] Invalid insights structure:', JSON.stringify(body.insights, null, 2).substring(0, 500));
+          emit({ 
+            error: true, 
+            message: 'Invalid insights structure - missing bike1 or bike2 data. Please re-run extraction in Step 3.' 
+          });
+          controller.close();
+          return;
+        }
+
+        // Ensure required arrays exist with defaults
+        if (!body.insights.bike1.praises) body.insights.bike1.praises = [];
+        if (!body.insights.bike1.complaints) body.insights.bike1.complaints = [];
+        if (!body.insights.bike1.surprising_insights) body.insights.bike1.surprising_insights = [];
+        if (!body.insights.bike2.praises) body.insights.bike2.praises = [];
+        if (!body.insights.bike2.complaints) body.insights.bike2.complaints = [];
+        if (!body.insights.bike2.surprising_insights) body.insights.bike2.surprising_insights = [];
+
         if (!process.env.ANTHROPIC_API_KEY) {
           emit({ error: true, message: 'Anthropic API key not configured' });
           controller.close();
@@ -341,7 +360,7 @@ async function generateNarrativePlan(
       story_angle: parsed.story_angle,
       hook_strategy: parsed.hook_strategy,
       hook_elements: parsed.hook_elements || { scenario: '', tension: '', promise: '' },
-      truth_bomb: parsed.truth_bomb || insights.bike1.surprising_insights?.[0] || 'Key insight from analysis',
+      truth_bomb: parsed.truth_bomb || insights.bike1?.surprising_insights?.[0] || insights.bike2?.surprising_insights?.[0] || 'Key insight from analysis',
       quote_allocation: parsed.quote_allocation || { hook: [], matrix_engine: [], matrix_comfort: [], matrix_ownership: [], verdict: [] },
       tension_points: parsed.tension_points || [],
       matrix_focus_areas: parsed.matrix_focus_areas || ['Engine Character', 'Comfort', 'Value'],
