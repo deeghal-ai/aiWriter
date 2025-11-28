@@ -41,12 +41,14 @@ export function buildMatrixPrompt(
     .map(c => `• ${c.category} (${c.frequency} mentions): "${c.quotes[0]?.text || 'No quote'}"`)
     .join('\n') || 'No relevant complaints found';
     
-  const relevantPersonas = personas.personas
+  // Safely access personas array with default
+  const personasArray = personas?.personas || [];
+  const relevantPersonas = personasArray
     .filter(p => 
-      p.priorities.some(pri => pri.toLowerCase().includes(focusKeyword))
+      (p.priorities || []).some(pri => pri.toLowerCase().includes(focusKeyword))
     )
-    .map(p => `${p.name} cares about ${focusArea} because: ${p.priorities.find(pri => pri.toLowerCase().includes(focusKeyword))}`)
-    .join('\n');
+    .map(p => `${p.name} cares about ${focusArea} because: ${(p.priorities || []).find(pri => pri.toLowerCase().includes(focusKeyword)) || 'general interest'}`)
+    .join('\n') || 'No specific persona relevance found';
 
   return `<role>
 You're writing the "${focusArea}" section of the decision matrix. This is where readers learn which bike wins in this dimension—and for WHOM.

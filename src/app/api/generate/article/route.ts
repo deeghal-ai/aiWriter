@@ -84,6 +84,37 @@ export async function POST(request: NextRequest) {
     if (!body.insights.bike2.complaints) body.insights.bike2.complaints = [];
     if (!body.insights.bike2.surprising_insights) body.insights.bike2.surprising_insights = [];
 
+    // Validate personas structure
+    if (!body.personas.personas || !Array.isArray(body.personas.personas)) {
+      console.error('[Article] Invalid personas structure:', JSON.stringify(body.personas, null, 2).substring(0, 500));
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid personas structure - missing personas array',
+          details: 'Please re-run persona generation in Step 4.',
+        } as ArticleGenerationResponse,
+        { status: 400 }
+      );
+    }
+
+    // Validate verdicts structure
+    if (!body.verdicts.verdicts || !Array.isArray(body.verdicts.verdicts)) {
+      console.error('[Article] Invalid verdicts structure:', JSON.stringify(body.verdicts, null, 2).substring(0, 500));
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid verdicts structure - missing verdicts array',
+          details: 'Please re-run verdict generation in Step 5.',
+        } as ArticleGenerationResponse,
+        { status: 400 }
+      );
+    }
+
+    // Ensure verdicts summary exists with defaults
+    if (!body.verdicts.summary) {
+      body.verdicts.summary = { bike1Wins: 0, bike2Wins: 0, closestCall: 'N/A' };
+    }
+
     // Check API key
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -374,30 +405,37 @@ async function generateSection(
   sectionType: string,
   data: any
 ): Promise<string> {
-  const promptBuilders: Record<string, Function> = {
-    hook: buildHookPrompt,
-    truthBomb: buildTruthBombPrompt,
-    personas: buildPersonasPrompt,
-    contrarian: buildContrarianPrompt,
-    verdicts: buildVerdictsPrompt,
-    bottomLine: buildBottomLinePrompt,
-  };
-
-  const promptBuilder = promptBuilders[sectionType];
-  if (!promptBuilder) {
-    throw new Error(`Unknown section type: ${sectionType}`);
+  // Build prompts with correct parameter order for each section type
+  let prompt: string;
+  
+  switch (sectionType) {
+    case 'hook':
+      // buildHookPrompt(bike1Name, bike2Name, narrativePlan, insights)
+      prompt = buildHookPrompt(data.bike1Name, data.bike2Name, data.narrativePlan, data.insights);
+      break;
+    case 'truthBomb':
+      // buildTruthBombPrompt(narrativePlan, insights)
+      prompt = buildTruthBombPrompt(data.narrativePlan, data.insights);
+      break;
+    case 'personas':
+      // buildPersonasPrompt(personas, narrativePlan)
+      prompt = buildPersonasPrompt(data.personas, data.narrativePlan);
+      break;
+    case 'contrarian':
+      // buildContrarianPrompt(winningBike, losingBike, narrativePlan, verdicts)
+      prompt = buildContrarianPrompt(data.winningBike, data.losingBike, data.narrativePlan, data.verdicts);
+      break;
+    case 'verdicts':
+      // buildVerdictsPrompt(verdicts, personas, narrativePlan)
+      prompt = buildVerdictsPrompt(data.verdicts, data.personas, data.narrativePlan);
+      break;
+    case 'bottomLine':
+      // buildBottomLinePrompt(bike1Name, bike2Name, narrativePlan, verdicts)
+      prompt = buildBottomLinePrompt(data.bike1Name, data.bike2Name, data.narrativePlan, data.verdicts);
+      break;
+    default:
+      throw new Error(`Unknown section type: ${sectionType}`);
   }
-
-  const prompt = promptBuilder(
-    data.bike1Name,
-    data.bike2Name,
-    data.narrativePlan,
-    data.insights,
-    data.personas,
-    data.verdicts,
-    data.winningBike,
-    data.losingBike
-  );
 
   const response = await client.messages.create({
     model: SONNET_CONFIG.model,

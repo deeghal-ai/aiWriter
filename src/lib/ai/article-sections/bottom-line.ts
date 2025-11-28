@@ -6,9 +6,12 @@ export function buildBottomLinePrompt(
   narrativePlan: NarrativePlan,
   verdicts: VerdictGenerationResult
 ): string {
-  // Defensive check with fallback
+  // Defensive checks with fallbacks
   const closingInsight = narrativePlan?.closing_insight || 
     `The best bike isn't the one with better specs—it's the one that matches your actual riding life`;
+  
+  // Safely access verdicts summary
+  const summary = verdicts?.summary || { bike1Wins: 0, bike2Wins: 0, closestCall: 'N/A' };
 
   return `<role>
 You're writing the closing section. Make it memorable—this is what they'll quote to friends.
@@ -19,9 +22,9 @@ ${closingInsight}
 </closing_insight>
 
 <verdict_summary>
-${verdicts.summary.bike1Wins} personas choose ${bike1Name}
-${verdicts.summary.bike2Wins} personas choose ${bike2Name}
-Closest call: ${verdicts.summary.closestCall}
+${summary.bike1Wins} personas choose ${bike1Name}
+${summary.bike2Wins} personas choose ${bike2Name}
+Closest call: ${summary.closestCall}
 </verdict_summary>
 
 <structure>

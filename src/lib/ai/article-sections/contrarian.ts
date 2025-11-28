@@ -6,9 +6,11 @@ export function buildContrarianPrompt(
   narrativePlan: NarrativePlan,
   verdicts: VerdictGenerationResult
 ): string {
-  const againstReasons = verdicts.verdicts
-    .flatMap(v => v.againstReasons)
-    .join('\n• ');
+  // Safely access verdicts array with defensive coding
+  const verdictsArray = verdicts?.verdicts || [];
+  const againstReasons = verdictsArray
+    .flatMap(v => v?.againstReasons || [])
+    .join('\n• ') || 'Some riders may prefer alternative features';
 
   // Defensive checks with fallbacks
   const contrarianAngle = narrativePlan?.contrarian_angle || {

@@ -4,12 +4,15 @@ export function buildPersonasPrompt(
   personas: PersonaGenerationResult,
   narrativePlan: NarrativePlan
 ): string {
+  // Safely access personas array with default
+  const personasArray = personas?.personas || [];
+  
   return `<role>
 You're introducing the rider personas. Each reader should finish this section thinking "That's me!" about one of them.
 </role>
 
 <personas>
-${JSON.stringify(personas.personas, null, 2)}
+${JSON.stringify(personasArray, null, 2)}
 </personas>
 
 <structure>

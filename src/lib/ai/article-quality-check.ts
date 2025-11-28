@@ -49,12 +49,15 @@ export function checkArticleQuality(
   ).length;
   const isBalanced = Math.abs(bike1Mentions - bike2Mentions) < 10;
 
-  // Persona references
+  // Persona references - safely access personas array
   const personaReferences: { [personaName: string]: boolean } = {};
-  personas.personas.forEach(persona => {
-    personaReferences[persona.name] = new RegExp(persona.name, 'i').test(
-      fullText
-    );
+  const personasArray = personas?.personas || [];
+  personasArray.forEach(persona => {
+    if (persona?.name) {
+      personaReferences[persona.name] = new RegExp(persona.name, 'i').test(
+        fullText
+      );
+    }
   });
 
   // Structure check

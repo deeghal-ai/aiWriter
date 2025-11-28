@@ -9,9 +9,13 @@ export function buildVerdictsPrompt(
   personas: PersonaGenerationResult,
   narrativePlan: NarrativePlan
 ): string {
-  const verdictsJson = JSON.stringify(verdicts.verdicts, null, 2);
+  // Safely access arrays with defaults
+  const verdictsArray = verdicts?.verdicts || [];
+  const personasArray = personas?.personas || [];
+  
+  const verdictsJson = JSON.stringify(verdictsArray, null, 2);
   const personasJson = JSON.stringify(
-    personas.personas.map(p => ({ 
+    personasArray.map(p => ({ 
       name: p.name, 
       title: p.title, 
       archetypeQuote: p.archetypeQuote 

@@ -32,22 +32,22 @@ ${bike2Name} - Surprising: ${insights.bike2?.surprising_insights?.[0] || 'None i
 </insights_summary>
 
 <personas>
-${personas.personas.map((p, i) => `
+${(personas?.personas || []).map((p, i) => `
 Persona ${i + 1}: ${p.name} - "${p.title}"
-- Usage: ${p.usagePattern.cityCommute}% city, ${p.usagePattern.highway}% highway
-- Priorities: ${p.priorities.slice(0, 3).join(', ')}
-- Archetype: "${p.archetypeQuote}"
-`).join('\n')}
+- Usage: ${p.usagePattern?.cityCommute || 0}% city, ${p.usagePattern?.highway || 0}% highway
+- Priorities: ${(p.priorities || []).slice(0, 3).join(', ') || 'Not specified'}
+- Archetype: "${p.archetypeQuote || 'N/A'}"
+`).join('\n') || 'No personas available'}
 </personas>
 
 <verdicts_summary>
-${verdicts.verdicts.map(v => `
+${(verdicts?.verdicts || []).map(v => `
 ${v.personaName} → ${v.recommendedBike} (${v.confidence}% confidence)
-Reason: ${v.reasoning[0]?.point || 'N/A'}
-`).join('\n')}
+Reason: ${v.reasoning?.[0]?.point || 'N/A'}
+`).join('\n') || 'No verdicts available'}
 
-Overall: ${verdicts.summary.bike1Wins} personas choose ${bike1Name}, ${verdicts.summary.bike2Wins} choose ${bike2Name}
-Closest call: ${verdicts.summary.closestCall}
+Overall: ${verdicts?.summary?.bike1Wins || 0} personas choose ${bike1Name}, ${verdicts?.summary?.bike2Wins || 0} choose ${bike2Name}
+Closest call: ${verdicts?.summary?.closestCall || 'N/A'}
 </verdicts_summary>
 
 <your_task>
