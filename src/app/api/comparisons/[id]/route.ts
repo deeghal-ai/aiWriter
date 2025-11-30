@@ -93,9 +93,10 @@ export async function PATCH(
       }
     }
     
+    // @ts-ignore - Supabase type inference issue with generated columns
     const { data, error } = await supabase
       .from('comparisons')
-      .update(updateData as any)
+      .update(updateData)
       .eq('id', id)
       .select('id, display_name, current_step, completed_steps, status, updated_at')
       .single();
