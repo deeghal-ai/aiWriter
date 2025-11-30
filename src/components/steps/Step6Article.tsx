@@ -48,6 +48,13 @@ export function Step6Article() {
     storedSections.every(s => s.status === 'complete') && 
     !storedIsGenerating;
 
+  // Mark step as complete if article is already generated (e.g., after page reload)
+  useEffect(() => {
+    if (isGenerationComplete) {
+      markStepComplete(6);
+    }
+  }, [isGenerationComplete, markStepComplete]);
+
   // Auto-start generation only if no sections exist and not already generating
   useEffect(() => {
     if (!storedIsGenerating && storedSections.length === 0 && insights && personas && verdicts) {
@@ -170,6 +177,7 @@ export function Step6Article() {
                   setStatusMessage('Article complete!');
                   setStoredIsGenerating(false);
                   setStoredPhase(4); // Mark as fully complete
+                  markStepComplete(6); // Mark step 6 as complete so it remains accessible
                 }
               }
             } catch (parseError) {
