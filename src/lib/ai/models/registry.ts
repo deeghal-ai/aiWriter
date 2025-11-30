@@ -398,7 +398,7 @@ const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
     description: 'Plan article narrative structure'
   },
   article_writing: {
-    modelId: 'claude-haiku-3.',
+    modelId: 'claude-haiku-3.5',
     temperature: 0.7,
     maxTokens: 4096,
     description: 'Write creative article sections'
