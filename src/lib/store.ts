@@ -65,7 +65,7 @@ interface AppState {
   markStepComplete: (step: number) => void;
   setComparison: (comparison: BikeComparison) => void;
   setScrapingProgress: (progress: ScrapingProgress[]) => void;
-  setInsights: (insights: InsightExtractionResult) => void;
+  setInsights: (insights: InsightExtractionResult | null) => void;
   setPersonas: (personas: PersonaGenerationResult | null) => void;
   setIsGeneratingPersonas: (isGenerating: boolean) => void;
   setVerdicts: (verdicts: VerdictGenerationResult | null) => void;
