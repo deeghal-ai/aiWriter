@@ -104,31 +104,47 @@ export function Step1Input() {
             
             <div className="space-y-3">
               {[
-                { id: 'youtube', label: 'YouTube Comments (top 5 videos per bike)', recommended: true }
+                { id: 'youtube', label: 'YouTube Reviews & Comments', description: 'Top videos with owner comments', recommended: true },
+                { id: 'reddit', label: 'Reddit r/IndianBikes', description: 'Forum discussions and experiences', recommended: true }
               ].map((source) => (
-                <div key={source.id} className="flex items-center gap-3">
+                <div key={source.id} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
                   <Checkbox
                     id={source.id}
                     checked={sources[source.id as keyof typeof sources]}
                     onCheckedChange={(checked) =>
                       setSources((prev) => ({ ...prev, [source.id]: checked as boolean }))
                     }
+                    className="mt-0.5"
                   />
-                  <label
-                    htmlFor={source.id}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    {source.label}
-                  </label>
+                  <div className="flex-1">
+                    <label
+                      htmlFor={source.id}
+                      className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
+                    >
+                      {source.label}
+                      {source.recommended && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Recommended</span>
+                      )}
+                    </label>
+                    <p className="text-xs text-slate-500 mt-1">{source.description}</p>
+                  </div>
                 </div>
               ))}
+              
+              <p className="text-xs text-slate-500 mt-2 italic">
+                💡 Tip: Enable both sources for richer insights and more accurate personas
+              </p>
             </div>
           </div>
           
           {/* Estimated time */}
           <div className="pt-4 border-t bg-slate-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
             <p className="text-sm text-slate-600">
-              <strong>Estimated research time:</strong> 2-3 minutes
+              <strong>Estimated research time:</strong>{' '}
+              {sources.youtube && sources.reddit ? '2-4 minutes' : '1-2 minutes'}
+              {sources.youtube && sources.reddit && (
+                <span className="text-blue-600 ml-2">(Combined sources = richer data)</span>
+              )}
             </p>
           </div>
         </CardContent>

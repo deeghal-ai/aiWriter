@@ -3,47 +3,65 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { ArrowRight, ArrowLeft, FileText, Loader2, Check, AlertCircle, Eye } from 'lucide-react';
+import { ArrowRight, ArrowLeft, FileText, Loader2, Check, AlertCircle, Eye, RefreshCw } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArticleSection, NarrativePlan, QualityReport } from '@/lib/types';
 
 export function Step6Article() {
   const setCurrentStep = useAppStore((state) => state.setCurrentStep);
   const markStepComplete = useAppStore((state) => state.markStepComplete);
-  const setArticleSections = useAppStore((state) => state.setArticleSections);
   const comparison = useAppStore((state) => state.comparison);
   const insights = useAppStore((state) => state.insights);
   const personas = useAppStore((state) => state.personas);
   const verdicts = useAppStore((state) => state.verdicts);
+  
+  // Persisted article state from store
+  const storedSections = useAppStore((state) => state.articleSections);
+  const storedNarrativePlan = useAppStore((state) => state.narrativePlan);
+  const storedQualityReport = useAppStore((state) => state.qualityReport);
+  const storedIsGenerating = useAppStore((state) => state.isGeneratingArticle);
+  const storedPhase = useAppStore((state) => state.articleGenerationPhase);
+  
+  // Store setters
+  const setStoredSections = useAppStore((state) => state.setArticleSections);
+  const setStoredNarrativePlan = useAppStore((state) => state.setNarrativePlan);
+  const setStoredQualityReport = useAppStore((state) => state.setQualityReport);
+  const setStoredIsGenerating = useAppStore((state) => state.setIsGeneratingArticle);
+  const setStoredPhase = useAppStore((state) => state.setArticleGenerationPhase);
+  const resetArticleGeneration = useAppStore((state) => state.resetArticleGeneration);
 
   const bike1Name = comparison?.bike1 || '';
   const bike2Name = comparison?.bike2 || '';
 
-  const [sections, setSections] = useState<ArticleSection[]>([]);
-  const [narrativePlan, setNarrativePlan] = useState<NarrativePlan | null>(null);
-  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
-  const [currentPhase, setCurrentPhase] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Local UI state (not persisted)
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const totalWordCount = sections.reduce((sum, s) => sum + s.wordCount, 0);
+  const totalWordCount = storedSections.reduce((sum, s) => sum + s.wordCount, 0);
   const targetWordCount = 4000;
   const progress = (totalWordCount / targetWordCount) * 100;
 
-  // Auto-start generation when component mounts
+  // Check if article generation is complete
+  const isGenerationComplete = storedSections.length > 0 && 
+    storedSections.every(s => s.status === 'complete') && 
+    !storedIsGenerating;
+
+  // Auto-start generation only if no sections exist and not already generating
   useEffect(() => {
-    if (!isGenerating && sections.length === 0 && insights && personas && verdicts) {
+    if (!storedIsGenerating && storedSections.length === 0 && insights && personas && verdicts) {
       startGeneration();
     }
   }, []);
 
-  const startGeneration = async () => {
-    setIsGenerating(true);
+  const startGeneration = useCallback(async () => {
+    setStoredIsGenerating(true);
     setError(null);
-    setSections([]);
+    setStoredSections([]);
+    setStoredNarrativePlan(null);
+    setStoredQualityReport(null);
+    setStoredPhase(0);
     setStatusMessage('Connecting to AI...');
 
     try {
@@ -70,6 +88,8 @@ export function Step6Article() {
         throw new Error('No response body');
       }
 
+      let currentSections: ArticleSection[] = [];
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -79,77 +99,81 @@ export function Step6Article() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
+            try {
+              const data = JSON.parse(line.slice(6));
 
-            if (data.error) {
-              setError(data.message);
-              setIsGenerating(false);
-              return;
-            }
-
-            // Phase 1: Narrative Planning
-            if (data.phase === 1) {
-              setCurrentPhase(1);
-              if (data.status === 'planning') {
-                setStatusMessage(data.message);
-              } else if (data.status === 'complete') {
-                setNarrativePlan(data.narrativePlan);
-                setStatusMessage('Narrative plan created!');
+              if (data.error) {
+                setError(data.message);
+                setStoredIsGenerating(false);
+                return;
               }
-            }
 
-            // Phase 2: Section Generation
-            if (data.phase === 2) {
-              setCurrentPhase(2);
-              if (data.status === 'started') {
-                setStatusMessage(data.message);
-              } else if (data.section) {
-                if (data.status === 'generating') {
-                  setStatusMessage(`Writing: ${data.focusArea || data.section}...`);
-                  // Add placeholder section
-                  setSections(prev => {
-                    const exists = prev.find(s => s.id === data.section);
-                    if (exists) return prev;
-                    return [
-                      ...prev,
-                      {
-                        id: data.section,
-                        title: data.focusArea || data.section,
-                        content: '',
-                        wordCount: 0,
-                        status: 'generating',
-                      },
-                    ];
-                  });
+              // Phase 1: Narrative Planning
+              if (data.phase === 1) {
+                setStoredPhase(1);
+                if (data.status === 'planning') {
+                  setStatusMessage(data.message);
                 } else if (data.status === 'complete') {
-                  // Update section with content
-                  setSections(prev =>
-                    prev.map(s =>
+                  setStoredNarrativePlan(data.narrativePlan);
+                  setStatusMessage('Narrative plan created!');
+                }
+              }
+
+              // Phase 2: Section Generation
+              if (data.phase === 2) {
+                setStoredPhase(2);
+                if (data.status === 'started') {
+                  setStatusMessage(data.message);
+                } else if (data.section) {
+                  if (data.status === 'generating') {
+                    setStatusMessage(`Writing: ${data.focusArea || data.section}...`);
+                    // Add placeholder section
+                    const exists = currentSections.find(s => s.id === data.section);
+                    if (!exists) {
+                      currentSections = [
+                        ...currentSections,
+                        {
+                          id: data.section,
+                          title: data.focusArea || data.section,
+                          content: '',
+                          wordCount: 0,
+                          status: 'generating',
+                        },
+                      ];
+                      setStoredSections(currentSections);
+                    }
+                  } else if (data.status === 'complete') {
+                    // Update section with content
+                    currentSections = currentSections.map(s =>
                       s.id === data.section
                         ? {
                             ...s,
                             content: data.content,
                             wordCount: data.wordCount,
-                            status: 'complete',
+                            status: 'complete' as const,
                           }
                         : s
-                    )
-                  );
+                    );
+                    setStoredSections(currentSections);
+                  }
                 }
               }
-            }
 
-            // Phase 3: Coherence & Quality
-            if (data.phase === 3) {
-              setCurrentPhase(3);
-              if (data.status === 'polishing') {
-                setStatusMessage(data.message);
-              } else if (data.status === 'complete') {
-                setSections(data.sections);
-                setQualityReport(data.qualityReport);
-                setStatusMessage('Article complete!');
-                setIsGenerating(false);
+              // Phase 3: Coherence & Quality
+              if (data.phase === 3) {
+                setStoredPhase(3);
+                if (data.status === 'polishing') {
+                  setStatusMessage(data.message);
+                } else if (data.status === 'complete') {
+                  setStoredSections(data.sections);
+                  setStoredQualityReport(data.qualityReport);
+                  setStatusMessage('Article complete!');
+                  setStoredIsGenerating(false);
+                  setStoredPhase(4); // Mark as fully complete
+                }
               }
+            } catch (parseError) {
+              console.warn('Failed to parse SSE data:', line);
             }
           }
         }
@@ -157,12 +181,19 @@ export function Step6Article() {
     } catch (err: any) {
       console.error('Article generation error:', err);
       setError(err.message);
-      setIsGenerating(false);
+      setStoredIsGenerating(false);
     }
+  }, [bike1Name, bike2Name, insights, personas, verdicts, setStoredSections, setStoredNarrativePlan, setStoredQualityReport, setStoredIsGenerating, setStoredPhase]);
+
+  const handleRegenerate = () => {
+    resetArticleGeneration();
+    setError(null);
+    setStatusMessage('');
+    // Start generation after a brief delay to allow state to update
+    setTimeout(() => startGeneration(), 100);
   };
 
   const handleNext = () => {
-    setArticleSections(sections);
     markStepComplete(6);
     setCurrentStep(7);
   };
@@ -186,7 +217,7 @@ export function Step6Article() {
                 <p className="text-sm text-red-700 mt-1">{error}</p>
               </div>
             </div>
-            <Button onClick={startGeneration} className="mt-4" variant="outline">
+            <Button onClick={handleRegenerate} className="mt-4" variant="outline">
               Retry Generation
             </Button>
           </CardContent>
@@ -194,37 +225,37 @@ export function Step6Article() {
       )}
 
       {/* Phase indicator */}
-      {isGenerating && (
+      {storedIsGenerating && (
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentPhase >= 1 ? 'bg-green-500 text-white' : 'bg-slate-200'
+                  storedPhase >= 1 ? 'bg-green-500 text-white' : 'bg-slate-200'
                 }`}>
-                  {currentPhase > 1 ? <Check className="h-4 w-4" /> : '1'}
+                  {storedPhase > 1 ? <Check className="h-4 w-4" /> : '1'}
                 </div>
-                <span className={currentPhase === 1 ? 'font-semibold' : ''}>
+                <span className={storedPhase === 1 ? 'font-semibold' : ''}>
                   Narrative Planning
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentPhase >= 2 ? 'bg-green-500 text-white' : 'bg-slate-200'
+                  storedPhase >= 2 ? 'bg-green-500 text-white' : 'bg-slate-200'
                 }`}>
-                  {currentPhase > 2 ? <Check className="h-4 w-4" /> : '2'}
+                  {storedPhase > 2 ? <Check className="h-4 w-4" /> : '2'}
                 </div>
-                <span className={currentPhase === 2 ? 'font-semibold' : ''}>
+                <span className={storedPhase === 2 ? 'font-semibold' : ''}>
                   Section Generation
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentPhase >= 3 ? 'bg-green-500 text-white' : 'bg-slate-200'
+                  storedPhase >= 3 ? 'bg-green-500 text-white' : 'bg-slate-200'
                 }`}>
-                  {currentPhase === 3 ? <Loader2 className="h-4 w-4 animate-spin" /> : '3'}
+                  {storedPhase === 3 ? <Loader2 className="h-4 w-4 animate-spin" /> : '3'}
                 </div>
-                <span className={currentPhase === 3 ? 'font-semibold' : ''}>
+                <span className={storedPhase === 3 ? 'font-semibold' : ''}>
                   Coherence & Polish
                 </span>
               </div>
@@ -259,22 +290,22 @@ export function Step6Article() {
       </Card>
 
       {/* Narrative Plan Summary */}
-      {narrativePlan && (
+      {storedNarrativePlan && (
         <Card className="mb-6">
           <CardContent className="pt-6">
             <h3 className="font-semibold mb-3">Narrative Plan</h3>
             <div className="space-y-2 text-sm">
               <div>
                 <span className="font-medium">Story Angle:</span>{' '}
-                <span className="text-slate-600">{narrativePlan.story_angle}</span>
+                <span className="text-slate-600">{storedNarrativePlan.story_angle}</span>
               </div>
               <div>
                 <span className="font-medium">Hook Strategy:</span>{' '}
-                <span className="text-slate-600">{narrativePlan.hook_strategy}</span>
+                <span className="text-slate-600">{storedNarrativePlan.hook_strategy}</span>
               </div>
               <div>
                 <span className="font-medium">Focus Areas:</span>{' '}
-                <span className="text-slate-600">{narrativePlan.matrix_focus_areas.join(', ')}</span>
+                <span className="text-slate-600">{storedNarrativePlan.matrix_focus_areas.join(', ')}</span>
               </div>
             </div>
           </CardContent>
@@ -283,7 +314,7 @@ export function Step6Article() {
       
       {/* Section list */}
       <div className="space-y-3">
-        {sections.map((section) => (
+        {storedSections.map((section) => (
           <Card key={section.id}>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
@@ -353,33 +384,33 @@ export function Step6Article() {
       </div>
 
       {/* Quality Report */}
-      {qualityReport && (
+      {storedQualityReport && (
         <Card className="mt-6">
           <CardContent className="pt-6">
             <h3 className="font-semibold mb-3">Quality Check</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium">Word Count:</span>{' '}
-                <span className={qualityReport.wordCount.inRange ? 'text-green-600' : 'text-amber-600'}>
-                  {qualityReport.wordCount.inRange ? '✓ In range' : '⚠ Out of range'}
+                <span className={storedQualityReport.wordCount.inRange ? 'text-green-600' : 'text-amber-600'}>
+                  {storedQualityReport.wordCount.inRange ? '✓ In range' : '⚠ Out of range'}
                 </span>
               </div>
               <div>
                 <span className="font-medium">Quotes:</span>{' '}
-                <span className={qualityReport.quoteCount.hasEnough ? 'text-green-600' : 'text-amber-600'}>
-                  {qualityReport.quoteCount.total} {qualityReport.quoteCount.hasEnough ? '✓' : '⚠'}
+                <span className={storedQualityReport.quoteCount.hasEnough ? 'text-green-600' : 'text-amber-600'}>
+                  {storedQualityReport.quoteCount.total} {storedQualityReport.quoteCount.hasEnough ? '✓' : '⚠'}
                 </span>
               </div>
               <div>
                 <span className="font-medium">Balance:</span>{' '}
-                <span className={qualityReport.balanceCheck.isBalanced ? 'text-green-600' : 'text-amber-600'}>
-                  {qualityReport.balanceCheck.isBalanced ? '✓ Balanced' : '⚠ Unbalanced'}
+                <span className={storedQualityReport.balanceCheck.isBalanced ? 'text-green-600' : 'text-amber-600'}>
+                  {storedQualityReport.balanceCheck.isBalanced ? '✓ Balanced' : '⚠ Unbalanced'}
                 </span>
               </div>
               <div>
                 <span className="font-medium">Banned Phrases:</span>{' '}
-                <span className={qualityReport.bannedPhrases.found.length === 0 ? 'text-green-600' : 'text-red-600'}>
-                  {qualityReport.bannedPhrases.found.length === 0 ? '✓ None' : `✗ ${qualityReport.bannedPhrases.found.length} found`}
+                <span className={storedQualityReport.bannedPhrases.found.length === 0 ? 'text-green-600' : 'text-red-600'}>
+                  {storedQualityReport.bannedPhrases.found.length === 0 ? '✓ None' : `✗ ${storedQualityReport.bannedPhrases.found.length} found`}
                 </span>
               </div>
             </div>
@@ -394,27 +425,32 @@ export function Step6Article() {
           size="lg"
           onClick={() => setCurrentStep(5)}
           className="gap-2"
-          disabled={isGenerating}
+          disabled={storedIsGenerating}
         >
           <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
         
         <div className="flex gap-2">
-          {!isGenerating && sections.length === 0 && (
+          {!storedIsGenerating && storedSections.length === 0 && (
             <Button onClick={startGeneration} size="lg" variant="outline">
               Start Generation
             </Button>
           )}
-          {!isGenerating && sections.length > 0 && (
-            <Button onClick={handleNext} size="lg" className="gap-2">
-              Polish Article
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+          {isGenerationComplete && (
+            <>
+              <Button onClick={handleRegenerate} size="lg" variant="outline" className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Regenerate
+              </Button>
+              <Button onClick={handleNext} size="lg" className="gap-2">
+                Polish Article
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </>
           )}
         </div>
       </div>
     </div>
   );
 }
-

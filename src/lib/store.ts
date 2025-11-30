@@ -10,7 +10,9 @@ import type {
   QualityCheck,
   InsightExtractionResult,
   PersonaGenerationResult,
-  VerdictGenerationResult 
+  VerdictGenerationResult,
+  NarrativePlan,
+  QualityReport
 } from './types';
 
 interface AppState {
@@ -44,9 +46,13 @@ interface AppState {
   verdicts: VerdictGenerationResult | null;
   isGeneratingVerdicts: boolean;
   
-  // Step 6: Article sections
+  // Step 6: Article generation (persisted)
   articleSections: ArticleSection[];
   articleWordCount: number;
+  narrativePlan: NarrativePlan | null;
+  qualityReport: QualityReport | null;
+  isGeneratingArticle: boolean;
+  articleGenerationPhase: number; // 0=not started, 1=planning, 2=sections, 3=coherence
   
   // Step 7: Quality checks
   qualityChecks: QualityCheck[];
@@ -65,10 +71,15 @@ interface AppState {
   setVerdicts: (verdicts: VerdictGenerationResult | null) => void;
   setIsGeneratingVerdicts: (isGenerating: boolean) => void;
   setArticleSections: (sections: ArticleSection[]) => void;
+  setNarrativePlan: (plan: NarrativePlan | null) => void;
+  setQualityReport: (report: QualityReport | null) => void;
+  setIsGeneratingArticle: (isGenerating: boolean) => void;
+  setArticleGenerationPhase: (phase: number) => void;
   setQualityChecks: (checks: QualityCheck[]) => void;
   setFinalArticle: (article: string) => void;
   setScrapedData: (source: 'reddit' | 'xbhp' | 'youtube', data: any) => void;
   getScrapedData: (source: 'reddit' | 'xbhp' | 'youtube') => any;
+  resetArticleGeneration: () => void;
   resetWorkflow: () => void;
 }
 
@@ -88,6 +99,10 @@ export const useAppStore = create<AppState>()(
       isGeneratingVerdicts: false,
       articleSections: [],
       articleWordCount: 0,
+      narrativePlan: null,
+      qualityReport: null,
+      isGeneratingArticle: false,
+      articleGenerationPhase: 0,
       qualityChecks: [],
       finalArticle: '',
       
@@ -114,10 +129,18 @@ export const useAppStore = create<AppState>()(
       setIsGeneratingVerdicts: (isGenerating) => set({ isGeneratingVerdicts: isGenerating }),
       
       setArticleSections: (sections) => 
-        set((state) => ({
+        set(() => ({
           articleSections: sections,
           articleWordCount: sections.reduce((sum, s) => sum + s.wordCount, 0)
         })),
+      
+      setNarrativePlan: (plan) => set({ narrativePlan: plan }),
+      
+      setQualityReport: (report) => set({ qualityReport: report }),
+      
+      setIsGeneratingArticle: (isGenerating) => set({ isGeneratingArticle: isGenerating }),
+      
+      setArticleGenerationPhase: (phase) => set({ articleGenerationPhase: phase }),
       
       setQualityChecks: (checks) => set({ qualityChecks: checks }),
       
@@ -135,6 +158,15 @@ export const useAppStore = create<AppState>()(
         return get().scrapedData[source];
       },
       
+      resetArticleGeneration: () => set({
+        articleSections: [],
+        articleWordCount: 0,
+        narrativePlan: null,
+        qualityReport: null,
+        isGeneratingArticle: false,
+        articleGenerationPhase: 0
+      }),
+      
       resetWorkflow: () => set({
         currentStep: 1,
         completedSteps: [],
@@ -148,6 +180,10 @@ export const useAppStore = create<AppState>()(
         isGeneratingVerdicts: false,
         articleSections: [],
         articleWordCount: 0,
+        narrativePlan: null,
+        qualityReport: null,
+        isGeneratingArticle: false,
+        articleGenerationPhase: 0,
         qualityChecks: [],
         finalArticle: ''
       })

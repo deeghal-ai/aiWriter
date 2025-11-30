@@ -4,7 +4,16 @@ import {
   VerdictGenerationResult,
   NarrativePlan,
 } from '../types';
+import {
+  buildCondensedContext,
+  determineOptimalHookStrategy,
+  serializeContextForPrompt,
+} from './article-context-builder';
 
+/**
+ * Build optimized narrative planning prompt
+ * Uses XML tags, condensed context, and pre-computed hook strategy
+ */
 export function buildNarrativePlanningPrompt(
   bike1Name: string,
   bike2Name: string,
@@ -12,94 +21,153 @@ export function buildNarrativePlanningPrompt(
   personas: PersonaGenerationResult,
   verdicts: VerdictGenerationResult
 ): string {
-  return `<role>
-You are a senior motorcycle journalist planning a comparison article. Your job is to find the STORY in this data—not just organize facts, but identify the narrative that will hook readers and guide them to a decision.
-</role>
+  // Build condensed context
+  const ctx = buildCondensedContext(bike1Name, bike2Name, insights, personas, verdicts);
+  
+  // Pre-determine optimal hook strategy based on data
+  const hookRecommendation = determineOptimalHookStrategy(ctx);
+  
+  // Get all quotes for allocation
+  const allQuotes = extractAllQuotesForAllocation(insights);
+  
+  return `<role>Senior motorcycle journalist planning a comparison article. Find the STORY, not just facts.</role>
 
-<bikes>
-Bike 1: ${bike1Name}
-Bike 2: ${bike2Name}
-</bikes>
+<task>Create a narrative plan for ${bike1Name} vs ${bike2Name} article</task>
 
-<insights_summary>
-${bike1Name} - Top Praises: ${(insights.bike1?.praises || []).slice(0, 5).map(p => p.category).join(', ') || 'No praises found'}
-${bike1Name} - Top Complaints: ${(insights.bike1?.complaints || []).slice(0, 3).map(c => c.category).join(', ') || 'No complaints found'}
-${bike1Name} - Surprising: ${insights.bike1?.surprising_insights?.[0] || 'None identified'}
+${serializeContextForPrompt(ctx)}
 
-${bike2Name} - Top Praises: ${(insights.bike2?.praises || []).slice(0, 5).map(p => p.category).join(', ') || 'No praises found'}
-${bike2Name} - Top Complaints: ${(insights.bike2?.complaints || []).slice(0, 3).map(c => c.category).join(', ') || 'No complaints found'}
-${bike2Name} - Surprising: ${insights.bike2?.surprising_insights?.[0] || 'None identified'}
-</insights_summary>
+<hook_recommendation>
+Strategy: ${hookRecommendation.strategy}
+Reason: ${hookRecommendation.reason}
+Suggested elements:
+- Scenario: ${hookRecommendation.elements.scenario}
+- Tension: ${hookRecommendation.elements.tension}
+- Promise: ${hookRecommendation.elements.promise}
+</hook_recommendation>
 
-<personas>
-${(personas?.personas || []).map((p, i) => `
-Persona ${i + 1}: ${p.name} - "${p.title}"
-- Usage: ${p.usagePattern?.cityCommute || 0}% city, ${p.usagePattern?.highway || 0}% highway
-- Priorities: ${(p.priorities || []).slice(0, 3).join(', ') || 'Not specified'}
-- Archetype: "${p.archetypeQuote || 'N/A'}"
-`).join('\n') || 'No personas available'}
-</personas>
+<available_quotes>
+${allQuotes.map((q, i) => `Q${i + 1}: "${q.text.slice(0, 80)}..." - ${q.author}, ${q.source} [${q.bikeName}, ${q.sentiment}]`).join('\n')}
+</available_quotes>
 
-<verdicts_summary>
-${(verdicts?.verdicts || []).map(v => `
-${v.personaName} → ${v.recommendedBike} (${v.confidence}% confidence)
-Reason: ${v.reasoning?.[0]?.point || 'N/A'}
-`).join('\n') || 'No verdicts available'}
+<planning_rules>
+1. story_angle: One sentence capturing the central tension
+2. hook_strategy: Use the recommended "${hookRecommendation.strategy}" OR choose different if data strongly suggests otherwise
+3. hook_elements: Specific, not generic. Use Indian cities, real scenarios
+4. truth_bomb: Single most surprising insight from data - NOT generic
+5. quote_allocation: Assign quote numbers (Q1, Q2...) to sections. Max 20 total, 2-3 per section
+6. tension_points: 3-4 trade-offs that create reader tension
+7. matrix_focus_areas: Top 5 comparison dimensions based on persona priorities
+8. contrarian_angle: Why someone might HATE the winner
+9. closing_insight: Unexpected truth to end with (quotable)
+10. callbacks: Elements to reference across sections
+</planning_rules>
 
-Overall: ${verdicts?.summary?.bike1Wins || 0} personas choose ${bike1Name}, ${verdicts?.summary?.bike2Wins || 0} choose ${bike2Name}
-Closest call: ${verdicts?.summary?.closestCall || 'N/A'}
-</verdicts_summary>
+<anti_patterns>
+❌ BAD story_angle: "A comparison of two popular bikes"
+✅ GOOD story_angle: "The battle between refined reliability and raw character"
 
-<your_task>
-Analyze this data and create a NARRATIVE PLAN for the article. Output a JSON object with:
+❌ BAD truth_bomb: "Both bikes have their pros and cons"
+✅ GOOD truth_bomb: "The 'premium' bike has 40% more service complaints in year 2"
 
-1. **story_angle**: The central tension/conflict of this comparison (one sentence)
-2. **hook_strategy**: Which of these hook types to use:
-   - "WhatsApp Debate" (friends arguing)
-   - "Unexpected Truth" (common belief that's wrong)
-   - "Specific Scenario" (day-in-the-life)
-   - "Price Paradox" (cheaper one isn't always cheaper)
-3. **hook_elements**: Specific details to include in hook
-4. **truth_bomb**: The single most surprising/contrarian insight to lead with
-5. **quote_allocation**: Which owner quotes to use in which sections (max 20 quotes total)
-6. **tension_points**: 3-4 key trade-offs that create reader tension
-7. **matrix_focus_areas**: Top 5 comparison dimensions based on persona priorities
-8. **contrarian_angle**: The "why you might hate the winner" perspective
-9. **closing_insight**: The unexpected truth to end with
-10. **callbacks**: Elements to reference across sections for coherence
-</your_task>
+❌ BAD hook_elements: { scenario: "Buying a bike", tension: "Hard choice", promise: "We'll help" }
+✅ GOOD hook_elements: { scenario: "₹2.8L EMI vs ₹2.2L upfront, 3AM on BikeDekho", tension: "Wife thinks it's about money. It isn't.", promise: "We rode both for 2000km. Here's what matters." }
 
-<output_format>
+❌ BAD matrix_focus_areas: ["Performance", "Comfort", "Value"]
+✅ GOOD matrix_focus_areas: ["Engine Character at 80kmph Cruise", "Bangalore Traffic Survival", "Real-World Fuel Costs", "Service Center Proximity", "Pillion Comfort Score"]
+</anti_patterns>
+
+<schema>
 {
-  "story_angle": "string",
-  "hook_strategy": "WhatsApp Debate" | "Unexpected Truth" | "Specific Scenario" | "Price Paradox",
+  "story_angle": "string - central narrative tension",
+  "hook_strategy": "WhatsApp Debate|Unexpected Truth|Specific Scenario|Price Paradox",
   "hook_elements": {
-    "scenario": "string",
-    "tension": "string",
-    "promise": "string"
+    "scenario": "specific situation with details",
+    "tension": "what's at stake",
+    "promise": "what reader will learn"
   },
-  "truth_bomb": "string",
+  "truth_bomb": "most surprising insight from the data",
   "quote_allocation": {
-    "hook": ["quote1"],
-    "matrix_engine": ["quote2", "quote3"],
-    "matrix_comfort": ["quote4"],
-    "verdict": ["quote5", "quote6"]
+    "hook": ["Q1", "Q2"],
+    "matrix_engine": ["Q3", "Q4", "Q5"],
+    "matrix_comfort": ["Q6", "Q7"],
+    "matrix_ownership": ["Q8", "Q9"],
+    "verdict": ["Q10", "Q11", "Q12"]
   },
   "tension_points": [
-    { "dimension": "string", "bike1_wins": "string", "bike2_wins": "string" }
+    { "dimension": "string", "bike1_wins": "specific win", "bike2_wins": "specific counter" }
   ],
-  "matrix_focus_areas": ["Engine Character", "Real-World Comfort", ...],
+  "matrix_focus_areas": ["Specific Area 1", "Specific Area 2", "Specific Area 3", "Specific Area 4", "Specific Area 5"],
   "contrarian_angle": {
-    "target_persona": "string",
-    "why_they_might_hate_winner": "string"
+    "target_persona": "persona name who might regret winner",
+    "why_they_might_hate_winner": "specific scenario where winner fails"
   },
-  "closing_insight": "string",
+  "closing_insight": "quotable final truth",
   "callbacks": [
-    { "introduce_in": "section", "callback_in": "section", "element": "string" }
+    { "introduce_in": "section", "callback_in": "section", "element": "what to callback" }
   ]
 }
-</output_format>
+</schema>
 
-Output ONLY valid JSON:`;
+Output valid JSON only:`;
 }
 
+/**
+ * Extract all quotes for quote allocation
+ */
+function extractAllQuotesForAllocation(insights: InsightExtractionResult): Array<{
+  text: string;
+  author: string;
+  source: string;
+  bikeName: string;
+  sentiment: string;
+}> {
+  const quotes: Array<{
+    text: string;
+    author: string;
+    source: string;
+    bikeName: string;
+    sentiment: string;
+  }> = [];
+
+  const sources = [
+    { bike: insights.bike1, bikeName: insights.bike1?.name || 'Bike 1' },
+    { bike: insights.bike2, bikeName: insights.bike2?.name || 'Bike 2' },
+  ];
+
+  for (const { bike, bikeName } of sources) {
+    if (!bike) continue;
+
+    // Praises
+    for (const praise of (bike.praises || []).slice(0, 4)) {
+      for (const quote of (praise.quotes || []).slice(0, 2)) {
+        quotes.push({
+          text: quote.text,
+          author: quote.author,
+          source: quote.source,
+          bikeName,
+          sentiment: 'praise',
+        });
+      }
+    }
+
+    // Complaints
+    for (const complaint of (bike.complaints || []).slice(0, 3)) {
+      for (const quote of (complaint.quotes || []).slice(0, 2)) {
+        quotes.push({
+          text: quote.text,
+          author: quote.author,
+          source: quote.source,
+          bikeName,
+          sentiment: 'complaint',
+        });
+      }
+    }
+  }
+
+  return quotes.slice(0, 25); // Max 25 quotes for allocation
+}
+
+/**
+ * System prompt for narrative planning
+ */
+export const NARRATIVE_PLANNER_SYSTEM = 'You are an expert motorcycle journalist. Plan compelling narratives based on real data. Output only valid JSON.';

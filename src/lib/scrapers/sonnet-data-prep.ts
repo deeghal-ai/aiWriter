@@ -7,12 +7,14 @@ interface PreparedComment {
   likes: number;
   qualityScore: number;
   topics: string[];
+  source: 'YouTube' | 'Reddit';
 }
 
 interface PreparedVideo {
   title: string;
   channel: string;
   isReview: boolean;
+  isRedditPost: boolean;  // Whether this is a Reddit post converted to video format
   keyPoints: string[];  // Extracted from description
   topComments: PreparedComment[];
 }
@@ -62,16 +64,29 @@ export function prepareBikeDataForSonnet(
 }
 
 function prepareVideo(video: any): PreparedVideo {
-  // Extract key points from description (not the whole thing)
-  const keyPoints = extractKeyPoints(video.description || '');
+  // Check if this is a Reddit post
+  const isRedditPost = video.isRedditPost || video.source === 'Reddit';
+  
+  // Extract key points from description/selftext (not the whole thing)
+  const textContent = video.description || video.selftext || '';
+  const keyPoints = extractKeyPoints(textContent);
+  
+  // For Reddit posts, also include the selftext as a key point if meaningful
+  if (isRedditPost && video.selftext && video.selftext.length > 50) {
+    const truncatedSelftext = video.selftext.substring(0, 200).trim();
+    if (truncatedSelftext && !keyPoints.includes(truncatedSelftext)) {
+      keyPoints.unshift(truncatedSelftext);
+    }
+  }
   
   // Identify if this is a review vs random mention
-  const isReview = isLikelyReview(video.title, video.description);
+  const isReview = isRedditPost || isLikelyReview(video.title, textContent);
   
-  // Process and score comments
+  // Process and score comments (lower threshold for Reddit since they're often higher quality)
+  const qualityThreshold = isRedditPost ? 35 : 40;
   const scoredComments = (video.comments || [])
     .map((c: any) => scoreAndEnrichComment(c))
-    .filter((c: PreparedComment) => c.qualityScore >= 40)  // Quality threshold
+    .filter((c: PreparedComment) => c.qualityScore >= qualityThreshold)
     .sort((a: PreparedComment, b: PreparedComment) => b.qualityScore - a.qualityScore);
   
   // Deduplicate similar comments
@@ -81,16 +96,23 @@ function prepareVideo(video: any): PreparedVideo {
     title: cleanTitle(video.title),
     channel: video.channelTitle || 'Unknown',
     isReview,
-    keyPoints,
-    topComments: dedupedComments.slice(0, 10)  // Top 10 per video
+    isRedditPost,
+    keyPoints: keyPoints.slice(0, 4),  // Max 4 key points
+    topComments: dedupedComments.slice(0, 10)  // Top 10 per video/post
   };
 }
 
 function scoreAndEnrichComment(comment: any): PreparedComment {
-  const text = (comment.text || '').trim();
-  const likes = comment.likeCount || 0;
+  const text = (comment.text || comment.body || '').trim();
+  const likes = comment.likeCount || comment.score || 0;
+  const source: 'YouTube' | 'Reddit' = comment.source === 'Reddit' ? 'Reddit' : 'YouTube';
   
   let score = 30;  // Base score
+  
+  // Reddit comments often have longer, more detailed experiences
+  if (source === 'Reddit') {
+    score += 5;  // Slight boost for Reddit's discussion format
+  }
   
   // Length scoring (50-400 chars is sweet spot)
   if (text.length >= 50 && text.length <= 400) score += 15;
@@ -143,7 +165,8 @@ function scoreAndEnrichComment(comment: any): PreparedComment {
     author: comment.author || 'Anonymous',
     likes,
     qualityScore: Math.max(0, Math.min(100, score)),
-    topics
+    topics,
+    source
   };
 }
 
@@ -253,11 +276,22 @@ function cleanCommentText(text: string): string {
 
 /**
  * Format prepared data for Sonnet prompt
- * Token-efficient structure
+ * Token-efficient structure with source attribution
  */
 export function formatForSonnetPrompt(data: PreparedBikeData): string {
+  // Count sources
+  const youtubeCount = data.videos.filter(v => !v.isRedditPost).length;
+  const redditCount = data.videos.filter(v => v.isRedditPost).length;
+  
   let output = `BIKE: ${data.bikeName}\n`;
-  output += `SOURCES: ${data.videoCount} videos, ${data.qualityComments} quality comments\n`;
+  output += `SOURCES: `;
+  
+  const sourceParts = [];
+  if (youtubeCount > 0) sourceParts.push(`${youtubeCount} YouTube videos`);
+  if (redditCount > 0) sourceParts.push(`${redditCount} Reddit posts`);
+  sourceParts.push(`${data.qualityComments} quality comments total`);
+  output += sourceParts.join(', ') + '\n';
+  
   output += `TOPICS MENTIONED: ${Object.entries(data.topicDistribution)
     .sort(([,a], [,b]) => b - a)
     .slice(0, 8)
@@ -268,9 +302,10 @@ export function formatForSonnetPrompt(data: PreparedBikeData): string {
   const commentsByTopic: Record<string, PreparedComment[]> = {};
   
   data.videos.forEach(video => {
-    // Add video context
-    if (video.isReview && video.keyPoints.length > 0) {
-      output += `[REVIEW: ${video.channel}] ${video.title}\n`;
+    // Add video/post context
+    const sourceLabel = video.isRedditPost ? 'REDDIT' : 'REVIEW';
+    if ((video.isReview || video.isRedditPost) && video.keyPoints.length > 0) {
+      output += `[${sourceLabel}: ${video.channel}] ${video.title}\n`;
       output += `Key points: ${video.keyPoints.join('; ')}\n\n`;
     }
     
@@ -283,19 +318,21 @@ export function formatForSonnetPrompt(data: PreparedBikeData): string {
     });
   });
   
-  // Output comments grouped by topic
-  output += `\n--- OWNER COMMENTS BY TOPIC ---\n\n`;
+  // Output comments grouped by topic with source attribution
+  output += `\n--- OWNER COMMENTS BY TOPIC ---\n`;
+  output += `(Source indicated: YT=YouTube, R=Reddit)\n\n`;
   
   for (const [topic, comments] of Object.entries(commentsByTopic)) {
     output += `[${topic.toUpperCase()}]\n`;
     
-    // Top 5 unique comments per topic
+    // Top 6 unique comments per topic (increased from 5 for combined sources)
     const uniqueComments = comments
       .sort((a, b) => b.qualityScore - a.qualityScore)
-      .slice(0, 5);
+      .slice(0, 6);
     
     uniqueComments.forEach(c => {
-      output += `• "${c.text}" —${c.author} (${c.likes}👍)\n`;
+      const sourceIcon = c.source === 'Reddit' ? 'R' : 'YT';
+      output += `• [${sourceIcon}] "${c.text}" —${c.author} (${c.likes}👍)\n`;
     });
     
     output += `\n`;

@@ -46,7 +46,7 @@ ${JSON.stringify(redditData, null, 2)}
 ${JSON.stringify(xbhpData, null, 2)}
 </additional_data>
 
-Note: Forum data may include Reddit posts, YouTube video reviews and comments, or other sources. Analyze all provided content regardless of the source.
+Note: Data sources include YouTube video reviews/comments and Reddit r/IndianBikes discussions. Attribute quotes correctly - use "YouTube" or "Reddit" as the source string.
 
 # Critical Instructions
 
@@ -72,9 +72,10 @@ Note: Forum data may include Reddit posts, YouTube video reviews and comments, o
    - Examples: "Owners report better fuel economy than claimed", "Pillion comfort worse than expected despite marketing"
 
 5. **Source Attribution**:
-   - Always cite the source: Reddit, xBhp, YouTube, etc.
+   - Always cite the source: "YouTube" or "Reddit" (use exact string)
    - Preserve author/channel username (or use "Anonymous" if unavailable)
-   - For YouTube, include channel name if available
+   - For YouTube comments, include channel name if available
+   - For Reddit comments, preserve Reddit username (u/username format)
 
 # Output Format
 

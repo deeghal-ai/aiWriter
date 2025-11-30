@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -27,38 +27,98 @@ export function Step2Scrape() {
   const setScrapedData = useAppStore((state) => state.setScrapedData);
   const scrapedData = useAppStore((state) => state.scrapedData);
   
-  const [statuses, setStatuses] = useState<ScrapingStatus[]>([
-    { source: 'YouTube Reviews', status: 'pending' }
-  ]);
+  // Initialize statuses based on selected sources
+  const getInitialStatuses = (): ScrapingStatus[] => {
+    const statuses: ScrapingStatus[] = [];
+    if (comparison?.researchSources?.youtube) {
+      statuses.push({ source: 'YouTube Reviews', status: 'pending' });
+    }
+    if (comparison?.researchSources?.reddit) {
+      statuses.push({ source: 'Reddit r/IndianBikes', status: 'pending' });
+    }
+    // Default to YouTube if nothing selected
+    if (statuses.length === 0) {
+      statuses.push({ source: 'YouTube Reviews', status: 'pending' });
+    }
+    return statuses;
+  };
+  
+  const [statuses, setStatuses] = useState<ScrapingStatus[]>(getInitialStatuses());
   const [isComplete, setIsComplete] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  // Use ref instead of state to prevent React Strict Mode double-calling
+  const hasInitialized = useRef(false);
+  const isScrapingInProgress = useRef(false);
   
   useEffect(() => {
-    if (!hasInitialized) {
-      // Check if we already have scraped YouTube data
-      const existingYouTubeData = scrapedData.youtube;
-      
+    // Prevent double execution in React Strict Mode
+    if (hasInitialized.current || isScrapingInProgress.current) return;
+    if (!comparison) return;
+    
+    // Mark as initialized immediately to prevent double-calls
+    hasInitialized.current = true;
+    
+    // Check if we already have scraped data for selected sources
+    const existingYouTubeData = scrapedData.youtube;
+    const existingRedditData = scrapedData.reddit;
+    const selectedYoutube = comparison?.researchSources?.youtube;
+    const selectedReddit = comparison?.researchSources?.reddit;
+    
+    // Build restored statuses from existing data
+    const restoredStatuses: ScrapingStatus[] = [];
+    let hasExistingData = false;
+    
+    if (selectedYoutube) {
       if (existingYouTubeData) {
-        // Restore the completed state
-        setStatuses([{
+        restoredStatuses.push({
           source: 'YouTube Reviews', 
           status: 'complete',
           data: existingYouTubeData,
           stats: {
-            posts: existingYouTubeData.bike1?.total_videos + existingYouTubeData.bike2?.total_videos || 0,
-            comments: existingYouTubeData.bike1?.total_comments + existingYouTubeData.bike2?.total_comments || 0
+            posts: (existingYouTubeData.bike1?.total_videos || 0) + (existingYouTubeData.bike2?.total_videos || 0),
+            comments: (existingYouTubeData.bike1?.total_comments || 0) + (existingYouTubeData.bike2?.total_comments || 0)
           }
-        }]);
-        setIsComplete(true);
-      } else if (comparison) {
-        // Only start scraping if no existing data
-        startScraping();
+        });
+        hasExistingData = true;
+      } else {
+        restoredStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
       }
-      
-      setHasInitialized(true);
+    }
+    
+    if (selectedReddit) {
+      if (existingRedditData) {
+        restoredStatuses.push({
+          source: 'Reddit r/IndianBikes', 
+          status: 'complete',
+          data: existingRedditData,
+          stats: {
+            posts: existingRedditData.metadata?.total_posts || 0,
+            comments: existingRedditData.metadata?.total_comments || 0
+          }
+        });
+        hasExistingData = true;
+      } else {
+        restoredStatuses.push({ source: 'Reddit r/IndianBikes', status: 'pending' });
+      }
+    }
+    
+    // Default to YouTube if nothing selected
+    if (restoredStatuses.length === 0) {
+      restoredStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
+    }
+    
+    setStatuses(restoredStatuses);
+    
+    // Check if all selected sources have data
+    const allComplete = restoredStatuses.every(s => s.status === 'complete');
+    
+    if (allComplete && hasExistingData) {
+      setIsComplete(true);
+    } else {
+      // Start scraping for pending sources
+      startScraping();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasInitialized, scrapedData.youtube, comparison]);
+  }, [comparison]);
   
   const updateStatus = (source: string, update: Partial<ScrapingStatus>) => {
     setStatuses(prev => 
@@ -149,16 +209,52 @@ export function Step2Scrape() {
       
     } catch (error) {
       console.error('YouTube scraping error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Check if it's a quota/rate limit error
+      const isQuotaError = errorMessage.includes('403') || errorMessage.includes('quota');
+      
       updateStatus('YouTube Reviews', {
         status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: isQuotaError 
+          ? 'YouTube API quota exceeded. Please wait or check your API quota in Google Cloud Console.'
+          : errorMessage
       });
     }
   };
   
   const startScraping = async () => {
-    // Only scrape YouTube for now
-    await scrapeYouTube();
+    // Prevent duplicate scraping calls
+    if (isScrapingInProgress.current) {
+      console.log('[Scrape] Already in progress, skipping duplicate call');
+      return;
+    }
+    isScrapingInProgress.current = true;
+    
+    const selectedYoutube = comparison?.researchSources?.youtube;
+    const selectedReddit = comparison?.researchSources?.reddit;
+    
+    // Run scraping for selected sources in parallel
+    const scrapingPromises: Promise<void>[] = [];
+    
+    if (selectedYoutube && !scrapedData.youtube) {
+      scrapingPromises.push(scrapeYouTube());
+    }
+    
+    if (selectedReddit && !scrapedData.reddit) {
+      scrapingPromises.push(scrapeReddit());
+    }
+    
+    // If no sources selected, default to YouTube
+    if (scrapingPromises.length === 0 && !scrapedData.youtube) {
+      scrapingPromises.push(scrapeYouTube());
+    }
+    
+    // Wait for all scraping to complete
+    await Promise.all(scrapingPromises);
+    
+    // Mark scraping as complete
+    isScrapingInProgress.current = false;
     
     // Check if scraping completed successfully
     setStatuses(prev => {
@@ -171,11 +267,34 @@ export function Step2Scrape() {
   };
   
   const restartScraping = () => {
-    setStatuses([
-      { source: 'YouTube Reviews', status: 'pending' }
-    ]);
+    // Reset scraping progress flag
+    isScrapingInProgress.current = false;
+    
+    // Reset statuses based on selected sources
+    const newStatuses: ScrapingStatus[] = [];
+    if (comparison?.researchSources?.youtube) {
+      newStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
+    }
+    if (comparison?.researchSources?.reddit) {
+      newStatuses.push({ source: 'Reddit r/IndianBikes', status: 'pending' });
+    }
+    if (newStatuses.length === 0) {
+      newStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
+    }
+    
+    setStatuses(newStatuses);
     setIsComplete(false);
-    startScraping();
+    
+    // Clear existing scraped data for selected sources
+    if (comparison?.researchSources?.youtube) {
+      setScrapedData('youtube', undefined);
+    }
+    if (comparison?.researchSources?.reddit) {
+      setScrapedData('reddit', undefined);
+    }
+    
+    // Start fresh scraping after a short delay to let state update
+    setTimeout(() => startScraping(), 100);
   };
   
   const handleNext = () => {
@@ -190,9 +309,14 @@ export function Step2Scrape() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2">Scraping Video Reviews</h2>
+        <h2 className="text-3xl font-bold mb-2">
+          {statuses.length > 1 ? 'Scraping Multiple Sources' : 'Scraping Video Reviews'}
+        </h2>
         <p className="text-slate-600">
-          Collecting owner experiences from YouTube reviews and discussions
+          {statuses.length > 1 
+            ? 'Collecting owner experiences from YouTube and Reddit for comprehensive insights'
+            : 'Collecting owner experiences from YouTube reviews and discussions'
+          }
         </p>
       </div>
       
@@ -207,7 +331,10 @@ export function Step2Scrape() {
               </div>
               <Progress value={undefined} className="h-2" />
               <p className="text-sm text-slate-600">
-                This may take 30-45 seconds. Fetching videos and comments from YouTube.
+                {statuses.length > 1 
+                  ? 'This may take 1-2 minutes. Fetching data from YouTube and Reddit in parallel.'
+                  : 'This may take 30-45 seconds. Fetching videos and comments from YouTube.'
+                }
               </p>
             </div>
           )}

@@ -56,19 +56,26 @@ export async function POST(request: NextRequest) {
     console.log(`[Sonnet] Starting extraction: ${bike1Name} vs ${bike2Name}`);
     
     // Step 1: Prepare data for both bikes (smart filtering, deduplication)
-    const dataSource = youtubeData || redditData;
+    // Combine YouTube and Reddit data for richer insights
+    const hasYouTube = !!youtubeData?.bike1 || !!youtubeData?.bike2;
+    const hasReddit = !!redditData?.bike1 || !!redditData?.bike2;
     
-    // Debug log the data source structure
-    console.log(`[Sonnet] Data source keys:`, dataSource ? Object.keys(dataSource) : 'null');
-    console.log(`[Sonnet] Has bike1:`, !!dataSource?.bike1);
-    console.log(`[Sonnet] Has bike2:`, !!dataSource?.bike2);
+    console.log(`[Sonnet] Data sources: YouTube=${hasYouTube}, Reddit=${hasReddit}`);
     
-    // Handle both structured (bike1/bike2) and flat data formats
-    const bike1Data = dataSource?.bike1 || dataSource;
-    const bike2Data = dataSource?.bike2 || dataSource;
+    // Prepare YouTube data
+    const bike1YouTubeData = youtubeData?.bike1;
+    const bike2YouTubeData = youtubeData?.bike2;
     
-    const bike1Prepared = prepareBikeDataForSonnet(bike1Data, bike1Name);
-    const bike2Prepared = prepareBikeDataForSonnet(bike2Data, bike2Name);
+    // Prepare Reddit data  
+    const bike1RedditData = redditData?.bike1;
+    const bike2RedditData = redditData?.bike2;
+    
+    // Combine sources into unified format for each bike
+    const bike1Combined = combineDataSources(bike1YouTubeData, bike1RedditData, bike1Name);
+    const bike2Combined = combineDataSources(bike2YouTubeData, bike2RedditData, bike2Name);
+    
+    const bike1Prepared = prepareBikeDataForSonnet(bike1Combined, bike1Name);
+    const bike2Prepared = prepareBikeDataForSonnet(bike2Combined, bike2Name);
     
     console.log(`[Sonnet] Data prepared:
       ${bike1Name}: ${bike1Prepared.qualityComments} quality comments from ${bike1Prepared.videoCount} videos
@@ -142,6 +149,70 @@ export async function POST(request: NextRequest) {
       details: error.message 
     } as InsightExtractionResponse, { status: 500 });
   }
+}
+
+/**
+ * Combine YouTube and Reddit data into a unified format
+ * Reddit posts are converted to video-like structure for consistent processing
+ */
+function combineDataSources(
+  youtubeData: any,
+  redditData: any,
+  bikeName: string
+): any {
+  const videos: any[] = [];
+  
+  // Add YouTube videos if available
+  if (youtubeData?.videos) {
+    videos.push(...youtubeData.videos);
+    console.log(`[Sonnet] Added ${youtubeData.videos.length} YouTube videos for ${bikeName}`);
+  }
+  
+  // Convert Reddit posts to video-like format for consistent processing
+  if (redditData?.posts && redditData.posts.length > 0) {
+    const redditAsVideos = redditData.posts.map((post: any) => ({
+      // Map Reddit post structure to video-like structure
+      title: post.title,
+      videoId: `reddit-${post.permalink?.replace(/\//g, '-') || Math.random()}`,
+      channelTitle: `Reddit u/${post.author}`,
+      description: post.selftext || '',
+      publishedAt: post.created_utc ? new Date(post.created_utc * 1000).toISOString() : new Date().toISOString(),
+      viewCount: post.score || 0,
+      // Convert Reddit comments to YouTube-like comment format
+      comments: (post.comments || []).map((comment: any) => ({
+        text: comment.body || '',
+        author: comment.author || 'Anonymous',
+        likeCount: comment.score || 0,
+        publishedAt: comment.created_utc ? new Date(comment.created_utc * 1000).toISOString() : new Date().toISOString(),
+        source: 'Reddit'  // Mark source for attribution
+      })),
+      // Mark as Reddit source
+      source: 'Reddit',
+      isRedditPost: true
+    }));
+    
+    videos.push(...redditAsVideos);
+    console.log(`[Sonnet] Added ${redditData.posts.length} Reddit posts (as videos) for ${bikeName}`);
+  }
+  
+  // Calculate totals
+  const totalVideos = videos.filter(v => !v.isRedditPost).length;
+  const totalRedditPosts = videos.filter(v => v.isRedditPost).length;
+  const totalComments = videos.reduce((sum, v) => sum + (v.comments?.length || 0), 0);
+  
+  console.log(`[Sonnet] Combined data for ${bikeName}: ${totalVideos} videos, ${totalRedditPosts} Reddit posts, ${totalComments} total comments`);
+  
+  return {
+    name: bikeName,
+    videos: videos,
+    total_videos: totalVideos,
+    total_reddit_posts: totalRedditPosts,
+    total_comments: totalComments,
+    sources: {
+      youtube: !!youtubeData?.videos?.length,
+      reddit: !!redditData?.posts?.length
+    }
+  };
 }
 
 /**

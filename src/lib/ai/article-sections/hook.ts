@@ -1,12 +1,16 @@
 import { NarrativePlan, InsightExtractionResult } from '../../types';
 
+/**
+ * Build hook prompt using narrative plan's dynamic hook strategy
+ * Incorporates insights and personas for grounded, specific opening
+ */
 export function buildHookPrompt(
   bike1Name: string,
   bike2Name: string,
   narrativePlan: NarrativePlan,
   insights: InsightExtractionResult
 ): string {
-  // Defensive checks with fallbacks
+  // Use the dynamically chosen strategy from narrative planning
   const hookStrategy = narrativePlan?.hook_strategy || 'Unexpected Truth';
   const hookElements = narrativePlan?.hook_elements || {
     scenario: `Comparing ${bike1Name} and ${bike2Name}`,
@@ -14,68 +18,71 @@ export function buildHookPrompt(
     promise: 'We analyzed real owner experiences to find out'
   };
 
-  return `<role>
-You are writing the opening hook of a motorcycle comparison article. You have 150-200 words to make readers NEED to continue reading.
-</role>
+  // Extract key data points for grounding
+  const bike1TopPraise = insights?.bike1?.praises?.[0]?.category || 'performance';
+  const bike2TopPraise = insights?.bike2?.praises?.[0]?.category || 'comfort';
+  const surprisingInsight = narrativePlan?.truth_bomb || 
+    insights?.bike1?.surprising_insights?.[0] || 
+    insights?.bike2?.surprising_insights?.[0] || 
+    'Real owner experiences reveal unexpected truths';
+
+  // Get allocated quotes for hook
+  const hookQuotes = (narrativePlan?.quote_allocation?.hook || []).slice(0, 2);
+
+  return `<role>You're writing the opening hook of a ${bike1Name} vs ${bike2Name} comparison article.</role>
+
+<task>Write 150-200 words that make readers NEED to continue reading</task>
 
 <strategy>
-Hook type: ${hookStrategy}
+Hook Type: ${hookStrategy}
 Scenario: ${hookElements.scenario}
 Tension: ${hookElements.tension}
 Promise: ${hookElements.promise}
 </strategy>
 
-<bikes>
-${bike1Name} vs ${bike2Name}
-</bikes>
+<grounding_data>
+${bike1Name} top strength: ${bike1TopPraise}
+${bike2Name} top strength: ${bike2TopPraise}
+Key insight: ${surprisingInsight}
+${hookQuotes.length > 0 ? `Allocated quotes: ${hookQuotes.join(', ')}` : ''}
+</grounding_data>
 
 <hook_templates>
+**${hookStrategy === 'WhatsApp Debate' ? '→ ' : ''}WhatsApp Debate:**
+Start with group chat argument. Specific city names, prices, scenarios.
+"Your WhatsApp group is split. Half swear ${bike1Name} is smarter—[specific reason]. Others defend ${bike2Name}—[counter]. You're stuck with ₹X lakhs and a decision."
 
-**If WhatsApp Debate:**
-Start with a group chat argument. Make it specific—real city names, real scenarios, real price points. End with the reader stuck in the middle.
+**${hookStrategy === 'Unexpected Truth' ? '→ ' : ''}Unexpected Truth:**
+Lead with contrarian insight. Make them say "wait, what?"
+"Everything you've read about ${bike1Name} vs ${bike2Name} misses the point. [Truth bomb]. This changes everything."
 
-Example structure:
-"Your WhatsApp group is split. Half swear [Bike A] is the smarter buy—[specific reason from insights]. The other half defend [Bike B]—[specific counter-reason]. You're stuck with ₹X lakhs and a decision that'll define your daily commute for the next 5 years.
+**${hookStrategy === 'Specific Scenario' ? '→ ' : ''}Specific Scenario:**
+Put reader in a moment. Make it visceral.
+"It's 8:47 AM on Outer Ring Road. You're in second gear, watching temperature climb. [Build tension]. This is where these bikes stop being spec sheets."
 
-We [did something specific—rode both, tested both, talked to X owners]. Here's what we found."
-
-**If Unexpected Truth:**
-Lead with the contrarian insight. Make them say "wait, what?"
-
-Example structure:
-"Everything you've read about [Bike A] vs [Bike B] is missing the point. The forums obsess over [common comparison point]. But after [our research/testing], we found something nobody's talking about: [truth bomb].
-
-This changes everything. Here's why."
-
-**If Specific Scenario:**
-Put the reader in a moment. Make it visceral.
-
-Example structure:
-"It's 8:47 AM on Outer Ring Road. You're in second gear, watching the temperature gauge climb. Your right hand is cramping. The Activa next to you looks annoyingly comfortable.
-
-This is where [Bike A] and [Bike B] stop being spec sheets and start being life choices. We spent [time period] living with both. Here's the truth about which one survives Bangalore."
-
-**If Price Paradox:**
+**${hookStrategy === 'Price Paradox' ? '→ ' : ''}Price Paradox:**
 Challenge the obvious value calculation.
-
-Example structure:
-"The [cheaper bike] costs ₹X less. Over 5 years, that's [calculation]. Obvious choice, right?
-
-Not so fast. We crunched the real numbers—insurance, maintenance, resale, fuel. The [more expensive bike] actually costs ₹Y less to own. Here's the math nobody shows you."
-
+"The ${bike1Name} costs ₹X less. Obvious choice, right? Not so fast. We crunched real numbers—insurance, maintenance, resale."
 </hook_templates>
 
 <requirements>
-1. Word count: 150-200 words (STRICT)
-2. Must mention both bike names
-3. Must include at least ONE specific number (price, distance, percentage)
-4. Must include at least ONE specific Indian city/location
-5. Must end with a clear promise of what's coming
-6. NO generic phrases like "Let's dive in" or "In this article we'll explore"
-7. Tone: Conversational but confident
+1. Word count: 150-200 words STRICT
+2. MUST mention both bike names
+3. MUST include ONE specific number (price, distance, %)
+4. MUST include ONE specific Indian city/location
+5. MUST end with clear promise
+6. BANNED phrases: "Let's dive in", "In this article", "Without further ado", "comprehensive guide"
+7. Tone: Conversational, confident, slightly provocative
 </requirements>
 
-<output>
-Write the hook section now. Output ONLY the article text, no JSON or labels:`;
-}
+<anti_patterns>
+❌ "Welcome to our comparison of these two popular motorcycles"
+❌ "Both bikes are great options for Indian riders"
+❌ "In this comprehensive guide, we'll explore..."
 
+✅ "Your colleague Vikram just bought a Duke. He won't shut up about it. Your gut says Apache—but what if you're wrong?"
+✅ "₹2.5 lakhs. One decision. Five years of living with it. Here's what 47 real owners wish they'd known."
+</anti_patterns>
+
+Write the hook now. Output ONLY the article text:`;
+}

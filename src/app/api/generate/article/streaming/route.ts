@@ -8,7 +8,7 @@ import {
   NarrativePlan,
   CoherenceEdits,
 } from '@/lib/types';
-import { buildNarrativePlanningPrompt } from '@/lib/ai/article-planner';
+import { buildNarrativePlanningPrompt, NARRATIVE_PLANNER_SYSTEM } from '@/lib/ai/article-planner';
 import { buildHookPrompt } from '@/lib/ai/article-sections/hook';
 import { buildTruthBombPrompt } from '@/lib/ai/article-sections/truth-bomb';
 import { buildPersonasPrompt } from '@/lib/ai/article-sections/personas';
@@ -18,13 +18,21 @@ import { buildVerdictsPrompt } from '@/lib/ai/article-sections/verdicts';
 import { buildBottomLinePrompt } from '@/lib/ai/article-sections/bottom-line';
 import { buildCoherencePrompt, applyCoherenceEdits } from '@/lib/ai/article-coherence';
 import { checkArticleQuality } from '@/lib/ai/article-quality-check';
+import { buildCondensedContext } from '@/lib/ai/article-context-builder';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+// Use Sonnet for creative writing, but with optimized prompts
 const SONNET_CONFIG = {
   model: 'claude-sonnet-4-20250514',
   temperature: 0.7,
+};
+
+// Use Haiku for faster narrative planning (structured output)
+const HAIKU_CONFIG = {
+  model: 'claude-3-5-haiku-20241022',
+  temperature: 0.5,
 };
 
 interface ArticleGenerationRequest {
@@ -53,9 +61,9 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        // Validate insights structure - this is critical!
+        // Validate insights structure
         if (!body.insights.bike1 || !body.insights.bike2) {
-          console.error('[Article Streaming] Invalid insights structure:', JSON.stringify(body.insights, null, 2).substring(0, 500));
+          console.error('[Article Streaming] Invalid insights structure');
           emit({ 
             error: true, 
             message: 'Invalid insights structure - missing bike1 or bike2 data. Please re-run extraction in Step 3.' 
@@ -74,10 +82,9 @@ export async function POST(request: NextRequest) {
 
         // Validate personas structure
         if (!body.personas.personas || !Array.isArray(body.personas.personas)) {
-          console.error('[Article Streaming] Invalid personas structure:', JSON.stringify(body.personas, null, 2).substring(0, 500));
           emit({ 
             error: true, 
-            message: 'Invalid personas structure - missing personas array. Please re-run persona generation in Step 4.' 
+            message: 'Invalid personas structure. Please re-run persona generation in Step 4.' 
           });
           controller.close();
           return;
@@ -85,10 +92,9 @@ export async function POST(request: NextRequest) {
 
         // Validate verdicts structure
         if (!body.verdicts.verdicts || !Array.isArray(body.verdicts.verdicts)) {
-          console.error('[Article Streaming] Invalid verdicts structure:', JSON.stringify(body.verdicts, null, 2).substring(0, 500));
           emit({ 
             error: true, 
-            message: 'Invalid verdicts structure - missing verdicts array. Please re-run verdict generation in Step 5.' 
+            message: 'Invalid verdicts structure. Please re-run verdict generation in Step 5.' 
           });
           controller.close();
           return;
@@ -108,17 +114,19 @@ export async function POST(request: NextRequest) {
         const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         const sections: ArticleSection[] = [];
 
-        // Phase 1: Narrative Planning
+        // Build condensed context once for efficiency
+        const condensedContext = buildCondensedContext(
+          body.bike1Name,
+          body.bike2Name,
+          body.insights,
+          body.personas,
+          body.verdicts
+        );
+
+        // Phase 1: Narrative Planning (use Haiku for speed - structured output)
         emit({ phase: 1, status: 'planning', message: 'Finding the story angle...' });
         
-        console.log('[Article] Starting narrative planning...');
-        console.log('[Article] Inputs:', {
-          bike1Name: body.bike1Name,
-          bike2Name: body.bike2Name,
-          hasInsights: !!body.insights,
-          hasPersonas: !!body.personas,
-          hasVerdicts: !!body.verdicts
-        });
+        console.log('[Article] Starting narrative planning with Haiku...');
 
         const narrativePlan = await generateNarrativePlan(
           client,
@@ -129,10 +137,10 @@ export async function POST(request: NextRequest) {
           body.verdicts
         );
         
-        console.log('[Article] Narrative plan generated successfully');
+        console.log('[Article] Narrative plan generated:', narrativePlan.hook_strategy);
         emit({ phase: 1, status: 'complete', narrativePlan });
 
-        // Phase 2: Section Generation
+        // Phase 2: Section Generation (use Sonnet for creative writing)
         emit({ phase: 2, status: 'started', message: 'Writing sections...' });
 
         // Hook
@@ -172,6 +180,7 @@ export async function POST(request: NextRequest) {
         const personasSection = await generateSection(client, 'personas', {
           personas: body.personas,
           narrativePlan,
+          insights: body.insights,
         });
         sections.push({
           id: 'personas',
@@ -219,7 +228,7 @@ export async function POST(request: NextRequest) {
 
         // Contrarian
         emit({ phase: 2, section: 'contrarian', status: 'generating' });
-        const majorityWinner = getMajorityWinner(body.verdicts);
+        const majorityWinner = getMajorityWinner(body.verdicts, body.bike1Name, body.bike2Name);
         const minorityWinner = getMinorityWinner(body.verdicts, body.bike1Name, body.bike2Name);
         
         const contrarian = await generateSection(client, 'contrarian', {
@@ -227,6 +236,7 @@ export async function POST(request: NextRequest) {
           losingBike: minorityWinner,
           narrativePlan,
           verdicts: body.verdicts,
+          insights: body.insights,
         });
         sections.push({
           id: 'contrarian',
@@ -243,6 +253,7 @@ export async function POST(request: NextRequest) {
           verdicts: body.verdicts,
           personas: body.personas,
           narrativePlan,
+          insights: body.insights,
         });
         sections.push({
           id: 'verdicts',
@@ -260,6 +271,8 @@ export async function POST(request: NextRequest) {
           bike2Name: body.bike2Name,
           narrativePlan,
           verdicts: body.verdicts,
+          insights: body.insights,
+          personas: body.personas,
         });
         sections.push({
           id: 'bottomline',
@@ -272,7 +285,7 @@ export async function POST(request: NextRequest) {
 
         emit({ phase: 2, status: 'complete' });
 
-        // Phase 3: Coherence Pass
+        // Phase 3: Coherence Pass (use Haiku for speed)
         emit({ phase: 3, status: 'polishing', message: 'Final coherence check...' });
         
         const coherenceEdits = await runCoherencePass(client, sections, narrativePlan);
@@ -319,20 +332,13 @@ export async function POST(request: NextRequest) {
   });
 }
 
-// Helper functions (same as non-streaming route)
+// Helper functions
 
-/**
- * Clean JSON response from AI that might be wrapped in markdown code blocks
- */
 function cleanJsonResponse(text: string): string {
-  // Remove markdown code blocks if present
   let cleaned = text.trim();
   
-  // Remove ```json ... ``` or ``` ... ```
   if (cleaned.startsWith('```')) {
-    // Find the first newline after opening ```
     const firstNewline = cleaned.indexOf('\n');
-    // Find the closing ```
     const lastBackticks = cleaned.lastIndexOf('```');
     
     if (firstNewline !== -1 && lastBackticks !== -1 && lastBackticks > firstNewline) {
@@ -359,10 +365,12 @@ async function generateNarrativePlan(
     verdicts
   );
 
+  // Use Haiku for narrative planning (structured output, faster)
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
+    model: HAIKU_CONFIG.model,
     max_tokens: 2000,
-    temperature: SONNET_CONFIG.temperature,
+    temperature: HAIKU_CONFIG.temperature,
+    system: NARRATIVE_PLANNER_SYSTEM,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -376,13 +384,11 @@ async function generateNarrativePlan(
   try {
     const parsed = JSON.parse(cleanedJson);
     
-    // Validate required fields
     if (!parsed.story_angle || !parsed.hook_strategy || !parsed.matrix_focus_areas) {
       console.error('[Article] Invalid narrative plan structure:', parsed);
       throw new Error('Narrative plan missing required fields');
     }
     
-    // Add defaults for optional fields
     return {
       story_angle: parsed.story_angle,
       hook_strategy: parsed.hook_strategy,
@@ -406,33 +412,26 @@ async function generateSection(
   sectionType: string,
   data: any
 ): Promise<string> {
-  // Build prompts with correct parameter order for each section type
   let prompt: string;
   
   switch (sectionType) {
     case 'hook':
-      // buildHookPrompt(bike1Name, bike2Name, narrativePlan, insights)
       prompt = buildHookPrompt(data.bike1Name, data.bike2Name, data.narrativePlan, data.insights);
       break;
     case 'truthBomb':
-      // buildTruthBombPrompt(narrativePlan, insights)
       prompt = buildTruthBombPrompt(data.narrativePlan, data.insights);
       break;
     case 'personas':
-      // buildPersonasPrompt(personas, narrativePlan)
-      prompt = buildPersonasPrompt(data.personas, data.narrativePlan);
+      prompt = buildPersonasPrompt(data.personas, data.narrativePlan, data.insights);
       break;
     case 'contrarian':
-      // buildContrarianPrompt(winningBike, losingBike, narrativePlan, verdicts)
-      prompt = buildContrarianPrompt(data.winningBike, data.losingBike, data.narrativePlan, data.verdicts);
+      prompt = buildContrarianPrompt(data.winningBike, data.losingBike, data.narrativePlan, data.verdicts, data.insights);
       break;
     case 'verdicts':
-      // buildVerdictsPrompt(verdicts, personas, narrativePlan)
-      prompt = buildVerdictsPrompt(data.verdicts, data.personas, data.narrativePlan);
+      prompt = buildVerdictsPrompt(data.verdicts, data.personas, data.narrativePlan, data.insights);
       break;
     case 'bottomLine':
-      // buildBottomLinePrompt(bike1Name, bike2Name, narrativePlan, verdicts)
-      prompt = buildBottomLinePrompt(data.bike1Name, data.bike2Name, data.narrativePlan, data.verdicts);
+      prompt = buildBottomLinePrompt(data.bike1Name, data.bike2Name, data.narrativePlan, data.verdicts, data.insights, data.personas);
       break;
     default:
       throw new Error(`Unknown section type: ${sectionType}`);
@@ -487,8 +486,9 @@ async function runCoherencePass(
 ): Promise<CoherenceEdits> {
   const prompt = buildCoherencePrompt(sections, narrativePlan);
 
+  // Use Haiku for coherence check (structured output, faster)
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
+    model: HAIKU_CONFIG.model,
     max_tokens: 1500,
     temperature: 0.3,
     messages: [{ role: 'user', content: prompt }],
@@ -500,13 +500,23 @@ async function runCoherencePass(
   }
 
   const cleanedJson = cleanJsonResponse(content.text);
-  return JSON.parse(cleanedJson);
+  
+  try {
+    return JSON.parse(cleanedJson);
+  } catch {
+    // Return empty edits if parsing fails
+    return {
+      transitions_added: [],
+      callbacks_added: [],
+      contradictions_found: [],
+      word_count_suggestion: '',
+    };
+  }
 }
 
-function getMajorityWinner(verdicts: VerdictGenerationResult): string {
-  return verdicts.summary.bike1Wins >= verdicts.summary.bike2Wins
-    ? verdicts.verdicts[0].recommendedBike
-    : verdicts.verdicts[0].otherBike;
+function getMajorityWinner(verdicts: VerdictGenerationResult, bike1Name: string, bike2Name: string): string {
+  const summary = verdicts.summary || { bike1Wins: 0, bike2Wins: 0 };
+  return summary.bike1Wins >= summary.bike2Wins ? bike1Name : bike2Name;
 }
 
 function getMinorityWinner(
@@ -514,11 +524,10 @@ function getMinorityWinner(
   bike1Name: string,
   bike2Name: string
 ): string {
-  const winner = getMajorityWinner(verdicts);
+  const winner = getMajorityWinner(verdicts, bike1Name, bike2Name);
   return winner === bike1Name ? bike2Name : bike1Name;
 }
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).length;
 }
-

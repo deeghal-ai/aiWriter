@@ -11,11 +11,12 @@ export function buildSingleBikeExtractionPrompt(
   bikeName: string,
   bikeData: any
 ): string {
-  return `<task>Extract owner insights for "${bikeName}" from forum data</task>
+  return `<task>Extract owner insights for "${bikeName}" from YouTube and Reddit data</task>
 
 <rules>
 - frequency = count of UNIQUE users mentioning the topic
 - quotes: exact text from source, max 80 words, include author
+- source: use "YouTube" or "Reddit" - attribute correctly based on where comment came from
 - categories: be specific ("Highway stability at 100kmph" not "Stability")
 - surprising: must contradict common assumptions, needs 2+ data points
 </rules>
@@ -27,14 +28,14 @@ export function buildSingleBikeExtractionPrompt(
     {
       "category": "specific praise topic",
       "frequency": number,
-      "quotes": [{"text": "exact quote", "author": "username", "source": "YouTube"}]
+      "quotes": [{"text": "exact quote", "author": "username", "source": "YouTube or Reddit"}]
     }
   ],
   "complaints": [
     {
       "category": "specific complaint topic", 
       "frequency": number,
-      "quotes": [{"text": "exact quote", "author": "username", "source": "YouTube"}]
+      "quotes": [{"text": "exact quote", "author": "username", "source": "YouTube or Reddit"}]
     }
   ],
   "surprising_insights": ["insight that contradicts expectations, backed by data"]
