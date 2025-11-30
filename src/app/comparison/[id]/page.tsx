@@ -72,7 +72,7 @@ export default function ComparisonPage() {
     };
 
     initializeWorkspace();
-  }, [params.id]);
+  }, [params.id, loadComparison, resetWorkflow, setComparisonId]);
 
   // Handle back navigation
   const handleBack = () => {

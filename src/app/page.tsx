@@ -316,7 +316,7 @@ export default function HomePage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Comparison?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will permanently delete "{comparison.display_name || `${comparison.bike1_name} vs ${comparison.bike2_name}`}" 
+                            This will permanently delete &quot;{comparison.display_name || `${comparison.bike1_name} vs ${comparison.bike2_name}`}&quot; 
                             and all its data. This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
