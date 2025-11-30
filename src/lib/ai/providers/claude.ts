@@ -17,8 +17,13 @@ import {
   buildSingleVerdictPrompt,
   VERDICT_SYSTEM_PROMPT
 } from "../prompts-optimized";
-import { getModelForTask, getModelById, type ModelDefinition } from "../model-selector";
-import { getModelApiConfig, type TaskType } from "../models/registry";
+import { 
+  getModelForTask, 
+  getModelById, 
+  getModelApiConfig, 
+  type ModelDefinition,
+  type TaskType 
+} from "../models/registry";
 import { BaseProvider } from "./base-provider";
 import type { AIProvider } from "../provider-interface";
 import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona, BikeInsights, Verdict } from "../../types";

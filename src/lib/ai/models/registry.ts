@@ -285,15 +285,24 @@ export function estimateCost(
   );
 }
 
+// ===== BACKWARD COMPATIBILITY =====
+// These types and functions are kept for existing code that imported from model-selector.ts
+
 /**
- * Get model config for task-based selection (backward compatibility)
+ * Legacy ModelConfig interface (from model-selector.ts)
  */
-export function getModelConfigForTask(task: 'extraction' | 'synthesis' | 'validation'): {
+export interface ModelConfig {
   model: string;
   maxTokens: number;
   temperature: number;
   useCase: string;
-} {
+}
+
+/**
+ * Get model config for task-based selection (backward compatibility)
+ * @deprecated Use getModelApiConfig() for new code
+ */
+export function getModelConfigForTask(task: 'extraction' | 'synthesis' | 'validation'): ModelConfig {
   const capability = task as ModelCapability;
   const model = getDefaultModel(capability);
   
@@ -308,6 +317,35 @@ export function getModelConfigForTask(task: 'extraction' | 'synthesis' | 'valida
     model: model.modelString,
     maxTokens: model.maxTokens,
     temperature: temperatureMap[model.speed],
+    useCase: model.description
+  };
+}
+
+/**
+ * Alias for getModelConfigForTask (backward compatibility)
+ * @deprecated Use getModelApiConfig() for new code
+ */
+export function getModelForTask(task: 'extraction' | 'synthesis' | 'validation'): ModelConfig {
+  return getModelConfigForTask(task);
+}
+
+/**
+ * Get model config by ID (backward compatibility)
+ */
+export function getModelConfigById(modelId: string): ModelConfig | null {
+  const model = getModelById(modelId);
+  if (!model) return null;
+  
+  const temperatureMap: Record<string, number> = {
+    'fast': 0,
+    'medium': 0.3,
+    'slow': 0.3
+  };
+  
+  return {
+    model: model.modelString,
+    maxTokens: model.maxTokens,
+    temperature: temperatureMap[model.speed] || 0.3,
     useCase: model.description
   };
 }
@@ -391,8 +429,9 @@ export function getTaskConfig(task: TaskType): TaskConfig {
 
 /**
  * Get the full model definition for a task
+ * Returns the ModelDefinition object, not ModelConfig
  */
-export function getModelForTask(task: TaskType): ModelDefinition {
+export function getModelDefinitionForTask(task: TaskType): ModelDefinition {
   const config = getTaskConfig(task);
   const model = getModelById(config.modelId);
   

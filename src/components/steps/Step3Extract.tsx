@@ -87,10 +87,8 @@ export function Step3Extract() {
     }, 1000);
     
     try {
-      // Use unified endpoint with modelId parameter
-      // Sonnet-specific endpoint is kept for backward compatibility but unified endpoint handles all models
-      const useSonnetEndpoint = selectedModelId === 'claude-sonnet-4' || selectedModelId === 'claude-opus-4';
-      const endpoint = useSonnetEndpoint ? '/api/extract/insights-sonnet' : '/api/extract/insights';
+      // Use unified endpoint - handles ALL models (Haiku, Sonnet, Opus)
+      const endpoint = '/api/extract/insights';
       
       console.log(`[Extract] Using model: ${selectedModel?.name || selectedModelId}`);
       
@@ -103,7 +101,7 @@ export function Step3Extract() {
           redditData: scrapedData.reddit,
           youtubeData: scrapedData.youtube,
           xbhpData: scrapedData.xbhp,
-          modelId: selectedModelId  // Pass selected model
+          modelId: selectedModelId  // Routes to appropriate extraction method
         })
       });
       
