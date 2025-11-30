@@ -112,10 +112,18 @@ export function Step2Scrape() {
     const allComplete = restoredStatuses.every(s => s.status === 'complete');
     
     if (allComplete && hasExistingData) {
+      // All data exists, just display it
       setIsComplete(true);
-    } else {
-      // Start scraping for pending sources
+    } else if (!hasExistingData) {
+      // No existing data at all, start scraping
       startScraping();
+    } else {
+      // Partial data exists - show what we have, don't re-scrape automatically
+      // User can manually click "Restart Scraping" if they want fresh data
+      const anyComplete = restoredStatuses.some(s => s.status === 'complete');
+      if (anyComplete) {
+        setIsComplete(true);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comparison]);

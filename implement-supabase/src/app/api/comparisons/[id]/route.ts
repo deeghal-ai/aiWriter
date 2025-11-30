@@ -1,0 +1,199 @@
+/**
+ * API Route: /api/comparisons/[id]
+ * 
+ * GET    - Get a single comparison by ID
+ * PATCH  - Update a comparison
+ * DELETE - Delete a comparison
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import type { ComparisonUpdate } from '@/lib/supabase/types';
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+// GET /api/comparisons/[id] - Get single comparison
+export async function GET(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const { id } = await params;
+    const supabase = createServerSupabaseClient();
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: 'Invalid comparison ID format' },
+        { status: 400 }
+      );
+    }
+    
+    const { data, error } = await supabase
+      .from('comparisons')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Comparison not found' },
+          { status: 404 }
+        );
+      }
+      console.error('Error fetching comparison:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch comparison', details: error.message },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Unexpected error in GET /api/comparisons/[id]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/comparisons/[id] - Update comparison
+export async function PATCH(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const { id } = await params;
+    const supabase = createServerSupabaseClient();
+    const body: ComparisonUpdate = await request.json();
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: 'Invalid comparison ID format' },
+        { status: 400 }
+      );
+    }
+    
+    // Update display_name if bike names are being updated
+    if (body.bike1_name || body.bike2_name) {
+      // First get current data to merge names
+      const { data: current } = await supabase
+        .from('comparisons')
+        .select('bike1_name, bike2_name')
+        .eq('id', id)
+        .single();
+      
+      if (current) {
+        const bike1 = body.bike1_name || current.bike1_name;
+        const bike2 = body.bike2_name || current.bike2_name;
+        body.display_name = `${bike1} vs ${bike2}`;
+      }
+    }
+    
+    // Automatically update status based on completed steps
+    if (body.completed_steps) {
+      if (body.completed_steps.length === 8) {
+        body.status = 'completed';
+      } else if (body.completed_steps.length > 0) {
+        body.status = 'in_progress';
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('comparisons')
+      .update(body)
+      .eq('id', id)
+      .select('id, display_name, current_step, completed_steps, status, updated_at')
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Comparison not found' },
+          { status: 404 }
+        );
+      }
+      console.error('Error updating comparison:', error);
+      return NextResponse.json(
+        { error: 'Failed to update comparison', details: error.message },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      ...data,
+      message: 'Comparison updated successfully',
+    });
+  } catch (error) {
+    console.error('Unexpected error in PATCH /api/comparisons/[id]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/comparisons/[id] - Delete comparison
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const { id } = await params;
+    const supabase = createServerSupabaseClient();
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: 'Invalid comparison ID format' },
+        { status: 400 }
+      );
+    }
+    
+    // Check if comparison exists first
+    const { data: existing } = await supabase
+      .from('comparisons')
+      .select('id')
+      .eq('id', id)
+      .single();
+    
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Comparison not found' },
+        { status: 404 }
+      );
+    }
+    
+    const { error } = await supabase
+      .from('comparisons')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting comparison:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete comparison', details: error.message },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Comparison deleted successfully',
+    });
+  } catch (error) {
+    console.error('Unexpected error in DELETE /api/comparisons/[id]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

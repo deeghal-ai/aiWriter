@@ -1,39 +1,53 @@
+/**
+ * BikeDekho AI Writer - State Management Store
+ * 
+ * Modified to support database persistence via Supabase.
+ * Works in two modes:
+ * 1. New comparison (comparisonId = null) - local state only
+ * 2. Saved comparison (comparisonId = uuid) - syncs with database
+ * 
+ * NOTE: This replaces the localStorage persistence with database sync.
+ */
+
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { 
   BikeComparison, 
   ScrapingProgress, 
-  Insight, 
-  Persona, 
-  Verdict, 
-  ArticleSection,
-  QualityCheck,
   InsightExtractionResult,
   PersonaGenerationResult,
   VerdictGenerationResult,
   NarrativePlan,
-  QualityReport
+  ArticleSection,
+  QualityReport,
+  QualityCheck,
 } from './types';
 
+// Types for scraped data storage
+interface ScrapedData {
+  reddit?: any;
+  xbhp?: any;
+  youtube?: any;
+}
+
 interface AppState {
+  // ============ COMPARISON IDENTITY ============
+  // ID of the current comparison (null = new/unsaved)
+  comparisonId: string | null;
+  
+  // ============ WORKFLOW STATE ============
   // Current step (1-8)
   currentStep: number;
   
   // Step completion status
   completedSteps: number[];
   
+  // ============ STEP DATA ============
   // Step 1: Input data
   comparison: BikeComparison | null;
   
   // Step 2: Scraping data
   scrapingProgress: ScrapingProgress[];
-  
-  // NEW: Raw scraped data
-  scrapedData: {
-    reddit?: any;
-    xbhp?: any;
-    youtube?: any;
-  };
+  scrapedData: ScrapedData;
   
   // Step 3: Extracted insights
   insights: InsightExtractionResult | null;
@@ -46,13 +60,13 @@ interface AppState {
   verdicts: VerdictGenerationResult | null;
   isGeneratingVerdicts: boolean;
   
-  // Step 6: Article generation (persisted)
+  // Step 6: Article generation
   articleSections: ArticleSection[];
   articleWordCount: number;
   narrativePlan: NarrativePlan | null;
   qualityReport: QualityReport | null;
   isGeneratingArticle: boolean;
-  articleGenerationPhase: number; // 0=not started, 1=planning, 2=sections, 3=coherence
+  articleGenerationPhase: number;
   
   // Step 7: Quality checks
   qualityChecks: QualityCheck[];
@@ -60,11 +74,24 @@ interface AppState {
   // Step 8: Final article
   finalArticle: string;
   
-  // Actions
+  // ============ UI STATE ============
+  isSaving: boolean;
+  lastSaved: Date | null;
+  saveError: string | null;
+  
+  // ============ DATABASE ACTIONS ============
+  setComparisonId: (id: string | null) => void;
+  loadComparison: (id: string) => Promise<boolean>;
+  saveComparison: () => Promise<string | null>;
+  deleteComparison: (id: string) => Promise<boolean>;
+  
+  // ============ EXISTING ACTIONS ============
   setCurrentStep: (step: number) => void;
   markStepComplete: (step: number) => void;
   setComparison: (comparison: BikeComparison) => void;
   setScrapingProgress: (progress: ScrapingProgress[]) => void;
+  setScrapedData: (source: 'reddit' | 'xbhp' | 'youtube', data: any) => void;
+  getScrapedData: (source: 'reddit' | 'xbhp' | 'youtube') => any;
   setInsights: (insights: InsightExtractionResult | null) => void;
   setPersonas: (personas: PersonaGenerationResult | null) => void;
   setIsGeneratingPersonas: (isGenerating: boolean) => void;
@@ -77,120 +104,303 @@ interface AppState {
   setArticleGenerationPhase: (phase: number) => void;
   setQualityChecks: (checks: QualityCheck[]) => void;
   setFinalArticle: (article: string) => void;
-  setScrapedData: (source: 'reddit' | 'xbhp' | 'youtube', data: any) => void;
-  getScrapedData: (source: 'reddit' | 'xbhp' | 'youtube') => any;
   resetArticleGeneration: () => void;
   resetWorkflow: () => void;
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      // Initial state
-      currentStep: 1,
-      completedSteps: [],
-      comparison: null,
-      scrapingProgress: [],
-      scrapedData: {},
-      insights: null,
-      personas: null,
-      isGeneratingPersonas: false,
-      verdicts: null,
-      isGeneratingVerdicts: false,
-      articleSections: [],
-      articleWordCount: 0,
-      narrativePlan: null,
-      qualityReport: null,
-      isGeneratingArticle: false,
-      articleGenerationPhase: 0,
-      qualityChecks: [],
-      finalArticle: '',
+// Initial state values
+const initialState = {
+  comparisonId: null,
+  currentStep: 1,
+  completedSteps: [],
+  comparison: null,
+  scrapingProgress: [],
+  scrapedData: {},
+  insights: null,
+  personas: null,
+  isGeneratingPersonas: false,
+  verdicts: null,
+  isGeneratingVerdicts: false,
+  articleSections: [],
+  articleWordCount: 0,
+  narrativePlan: null,
+  qualityReport: null,
+  isGeneratingArticle: false,
+  articleGenerationPhase: 0,
+  qualityChecks: [],
+  finalArticle: '',
+  isSaving: false,
+  lastSaved: null,
+  saveError: null,
+};
+
+export const useAppStore = create<AppState>()((set, get) => ({
+  ...initialState,
+  
+  // ============ DATABASE ACTIONS ============
+  
+  setComparisonId: (id) => set({ comparisonId: id }),
+  
+  /**
+   * Load a comparison from the database
+   */
+  loadComparison: async (id: string) => {
+    try {
+      const response = await fetch(`/api/comparisons/${id}`);
       
-      // Actions
-      setCurrentStep: (step) => set({ currentStep: step }),
+      if (!response.ok) {
+        console.error('Failed to load comparison:', response.statusText);
+        return false;
+      }
       
-      markStepComplete: (step) => 
-        set((state) => ({
-          completedSteps: [...new Set([...state.completedSteps, step])]
-        })),
+      const data = await response.json();
       
-      setComparison: (comparison) => set({ comparison }),
-      
-      setScrapingProgress: (progress) => set({ scrapingProgress: progress }),
-      
-      setInsights: (insights) => set({ insights }),
-      
-      setPersonas: (personas) => set({ personas }),
-      
-      setIsGeneratingPersonas: (isGenerating) => set({ isGeneratingPersonas: isGenerating }),
-      
-      setVerdicts: (verdicts) => set({ verdicts }),
-      
-      setIsGeneratingVerdicts: (isGenerating) => set({ isGeneratingVerdicts: isGenerating }),
-      
-      setArticleSections: (sections) => 
-        set(() => ({
-          articleSections: sections,
-          articleWordCount: sections.reduce((sum, s) => sum + s.wordCount, 0)
-        })),
-      
-      setNarrativePlan: (plan) => set({ narrativePlan: plan }),
-      
-      setQualityReport: (report) => set({ qualityReport: report }),
-      
-      setIsGeneratingArticle: (isGenerating) => set({ isGeneratingArticle: isGenerating }),
-      
-      setArticleGenerationPhase: (phase) => set({ articleGenerationPhase: phase }),
-      
-      setQualityChecks: (checks) => set({ qualityChecks: checks }),
-      
-      setFinalArticle: (article) => set({ finalArticle: article }),
-      
-      setScrapedData: (source, data) =>
-        set((state) => ({
-          scrapedData: {
-            ...state.scrapedData,
-            [source]: data
-          }
-        })),
-      
-      getScrapedData: (source) => {
-        return get().scrapedData[source];
-      },
-      
-      resetArticleGeneration: () => set({
-        articleSections: [],
-        articleWordCount: 0,
-        narrativePlan: null,
-        qualityReport: null,
-        isGeneratingArticle: false,
-        articleGenerationPhase: 0
-      }),
-      
-      resetWorkflow: () => set({
-        currentStep: 1,
-        completedSteps: [],
-        comparison: null,
+      // Map database fields to store state
+      set({
+        comparisonId: data.id,
+        currentStep: data.current_step || 1,
+        completedSteps: data.completed_steps || [],
+        comparison: data.bike1_name && data.bike2_name ? {
+          bike1: data.bike1_name,
+          bike2: data.bike2_name,
+          researchSources: {
+            xbhp: true,
+            teamBhp: false,
+            reddit: true,
+            youtube: true,
+            instagram: false,
+          },
+        } : null,
+        scrapedData: data.scraped_data || {},
+        insights: data.insights,
+        personas: data.personas,
+        verdicts: data.verdicts,
+        narrativePlan: data.narrative_plan,
+        articleSections: data.article_sections || [],
+        articleWordCount: data.article_word_count || 0,
+        qualityReport: data.quality_report,
+        qualityChecks: data.quality_checks || [],
+        finalArticle: data.final_article || '',
+        // Reset transient state
         scrapingProgress: [],
-        scrapedData: {},
-        insights: null,
-        personas: null,
         isGeneratingPersonas: false,
-        verdicts: null,
         isGeneratingVerdicts: false,
-        articleSections: [],
-        articleWordCount: 0,
-        narrativePlan: null,
-        qualityReport: null,
         isGeneratingArticle: false,
         articleGenerationPhase: 0,
-        qualityChecks: [],
-        finalArticle: ''
-      })
-    }),
-    {
-      name: 'bikedekho-ai-writer-storage',
+        isSaving: false,
+        saveError: null,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error loading comparison:', error);
+      return false;
     }
-  )
-);
+  },
+  
+  /**
+   * Save current state to database
+   * Creates new comparison if comparisonId is null, otherwise updates
+   */
+  saveComparison: async () => {
+    const state = get();
+    
+    // Must have bike names to save
+    if (!state.comparison?.bike1 || !state.comparison?.bike2) {
+      set({ saveError: 'Cannot save: bike names are required' });
+      return null;
+    }
+    
+    set({ isSaving: true, saveError: null });
+    
+    try {
+      // Prepare payload
+      const payload = {
+        bike1_name: state.comparison.bike1,
+        bike2_name: state.comparison.bike2,
+        current_step: state.currentStep,
+        completed_steps: state.completedSteps,
+        scraped_data: state.scrapedData,
+        insights: state.insights,
+        personas: state.personas,
+        verdicts: state.verdicts,
+        narrative_plan: state.narrativePlan,
+        article_sections: state.articleSections,
+        article_word_count: state.articleWordCount,
+        quality_report: state.qualityReport,
+        quality_checks: state.qualityChecks,
+        final_article: state.finalArticle,
+        status: state.completedSteps.includes(8) 
+          ? 'completed' 
+          : state.completedSteps.length > 0 
+            ? 'in_progress' 
+            : 'draft',
+      };
+      
+      let response: Response;
+      
+      if (state.comparisonId) {
+        // Update existing comparison
+        response = await fetch(`/api/comparisons/${state.comparisonId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Create new comparison
+        response = await fetch('/api/comparisons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save comparison');
+      }
+      
+      const result = await response.json();
+      
+      // Update comparisonId if this was a new comparison
+      if (!state.comparisonId && result.id) {
+        set({ comparisonId: result.id });
+      }
+      
+      set({ 
+        isSaving: false, 
+        lastSaved: new Date(),
+        saveError: null,
+      });
+      
+      return result.id || state.comparisonId;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save';
+      console.error('Error saving comparison:', error);
+      set({ 
+        isSaving: false, 
+        saveError: errorMessage,
+      });
+      return null;
+    }
+  },
+  
+  /**
+   * Delete a comparison from the database
+   */
+  deleteComparison: async (id: string) => {
+    try {
+      const response = await fetch(`/api/comparisons/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to delete comparison:', response.statusText);
+        return false;
+      }
+      
+      // If deleting current comparison, reset state
+      if (get().comparisonId === id) {
+        get().resetWorkflow();
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting comparison:', error);
+      return false;
+    }
+  },
+  
+  // ============ EXISTING ACTIONS ============
+  
+  setCurrentStep: (step) => set({ currentStep: step }),
+  
+  markStepComplete: (step) => 
+    set((state) => ({
+      completedSteps: [...new Set([...state.completedSteps, step])]
+    })),
+  
+  setComparison: (comparison) => set({ comparison }),
+  
+  setScrapingProgress: (progress) => set({ scrapingProgress: progress }),
+  
+  setScrapedData: (source, data) =>
+    set((state) => ({
+      scrapedData: {
+        ...state.scrapedData,
+        [source]: data,
+      },
+    })),
+  
+  getScrapedData: (source) => get().scrapedData[source],
+  
+  setInsights: (insights) => set({ insights }),
+  
+  setPersonas: (personas) => set({ personas }),
+  
+  setIsGeneratingPersonas: (isGenerating) => set({ isGeneratingPersonas: isGenerating }),
+  
+  setVerdicts: (verdicts) => set({ verdicts }),
+  
+  setIsGeneratingVerdicts: (isGenerating) => set({ isGeneratingVerdicts: isGenerating }),
+  
+  setArticleSections: (sections) => 
+    set(() => ({
+      articleSections: sections,
+      articleWordCount: sections.reduce((sum, s) => sum + (s.wordCount || 0), 0),
+    })),
+  
+  setNarrativePlan: (plan) => set({ narrativePlan: plan }),
+  
+  setQualityReport: (report) => set({ qualityReport: report }),
+  
+  setIsGeneratingArticle: (isGenerating) => set({ isGeneratingArticle: isGenerating }),
+  
+  setArticleGenerationPhase: (phase) => set({ articleGenerationPhase: phase }),
+  
+  setQualityChecks: (checks) => set({ qualityChecks: checks }),
+  
+  setFinalArticle: (article) => set({ finalArticle: article }),
+  
+  resetArticleGeneration: () => set({
+    articleSections: [],
+    articleWordCount: 0,
+    narrativePlan: null,
+    qualityReport: null,
+    isGeneratingArticle: false,
+    articleGenerationPhase: 0,
+  }),
+  
+  resetWorkflow: () => set({ ...initialState }),
+}));
 
+// ============ HELPER HOOKS ============
+
+/**
+ * Hook to auto-save after step completion
+ * Usage: const autoSave = useAutoSave();
+ *        await autoSave(); // Call after completing a step
+ */
+export function useAutoSave() {
+  const { saveComparison, comparisonId, comparison } = useAppStore();
+  
+  return async () => {
+    // Only auto-save if we have bike names (minimum data)
+    if (comparison?.bike1 && comparison?.bike2) {
+      await saveComparison();
+    }
+  };
+}
+
+/**
+ * Hook to get save status
+ * Uses individual selectors to avoid creating new objects on every render
+ */
+export function useSaveStatus() {
+  const isSaving = useAppStore((state) => state.isSaving);
+  const lastSaved = useAppStore((state) => state.lastSaved);
+  const saveError = useAppStore((state) => state.saveError);
+  const comparisonId = useAppStore((state) => state.comparisonId);
+  
+  return { isSaving, lastSaved, saveError, comparisonId };
+}
