@@ -2,27 +2,90 @@
 
 ## Overview
 
-This directory contains a **modular AI provider system** that allows you to easily swap between different AI models (Claude, OpenAI, Gemini, etc.) without changing your application code.
+This directory contains a **modular AI provider system** with a **centralized model registry** that allows you to easily:
+- Add new models (just add an entry to the registry)
+- Switch between providers (Claude, OpenAI, Gemini, etc.)
+- Select models by capability (extraction, synthesis, validation)
+- Display dynamic model options in the UI
 
 ## Architecture
 
 ```
 src/lib/ai/
-├── provider-interface.ts    # Base interface all providers must implement
-├── factory.ts               # Factory to create the right provider
+├── models/
+│   ├── registry.ts          # Centralized model registry (single source of truth)
+│   └── index.ts             # Re-exports
+├── providers/
+│   ├── base-provider.ts     # Abstract base class for providers
+│   ├── claude.ts            # Claude/Anthropic implementation ✅
+│   └── index.ts             # Provider factory & exports
+├── provider-interface.ts    # Legacy interface (kept for compatibility)
+├── factory.ts               # Factory functions with retry logic
+├── model-selector.ts        # Task-based model selection (uses registry)
 ├── schemas.ts               # JSON schemas for structured outputs
-├── prompts.ts               # Prompt templates (reusable)
-└── providers/
-    ├── claude.ts            # Claude/Anthropic implementation ✅
-    ├── openai.ts            # OpenAI implementation (TODO)
-    └── gemini.ts            # Google Gemini implementation (TODO)
+├── prompts.ts               # Prompt templates
+└── prompts-optimized.ts     # Optimized prompts with few-shot examples
 ```
 
-## Current Provider
+## Model Registry
 
-**Active**: Claude (Anthropic)  
-**Model**: claude-sonnet-4-20250514  
-**Status**: ✅ Fully implemented
+The model registry (`models/registry.ts`) is the **single source of truth** for all available AI models.
+
+### Adding a New Model
+
+Simply add an entry to `MODEL_REGISTRY`:
+
+```typescript
+// In models/registry.ts
+{
+  id: 'gpt-4o',                    // Unique identifier
+  provider: 'openai',              // Which provider handles this
+  name: 'GPT-4o',                  // Display name
+  modelString: 'gpt-4o',           // API model string
+  capabilities: ['extraction', 'synthesis', 'generation'],
+  speed: 'medium',
+  quality: 'high',
+  costPer1kTokens: { input: 0.005, output: 0.015 },
+  maxTokens: 4096,
+  contextWindow: 128000,
+  description: 'OpenAI flagship model.',
+  enabled: true,  // Set to true when provider is implemented
+}
+```
+
+### Using the Registry
+
+```typescript
+import { 
+  getModelById, 
+  getModelsForCapability, 
+  getDefaultModel,
+  getModelOptions 
+} from '@/lib/ai/models/registry';
+
+// Get a specific model
+const sonnet = getModelById('claude-sonnet-4');
+
+// Get all models for extraction
+const extractionModels = getModelsForCapability('extraction');
+
+// Get the default model for a capability
+const defaultExtractor = getDefaultModel('extraction');
+
+// Get options formatted for UI dropdowns
+const options = getModelOptions('extraction');
+// Returns: [{ id, name, description, speed, quality, badge }, ...]
+```
+
+## Current Providers
+
+| Provider | Status | Models |
+|----------|--------|--------|
+| Anthropic (Claude) | ✅ Active | Haiku 3.5, Sonnet 4, Opus 4 |
+| OpenAI | 🚧 Planned | GPT-4o, GPT-4o Mini |
+| Google Gemini | 🚧 Planned | 1.5 Pro, 1.5 Flash |
+| Hugging Face | 🚧 Planned | Llama 3.3, Mixtral |
+| Local (Ollama) | 🚧 Planned | Llama 3.2 |
 
 ## How to Use
 
@@ -34,8 +97,23 @@ import { extractInsights } from '@/lib/ai/factory';
 const insights = await extractInsights(
   "KTM 390 Adventure",
   "Royal Enfield Himalayan 440",
-  redditData,
-  xbhpData
+  scrapedData
+);
+```
+
+### With Specific Model
+
+```typescript
+import { extractInsightsWithModel } from '@/lib/ai/factory';
+import { getModelById } from '@/lib/ai/models/registry';
+
+const model = getModelById('claude-sonnet-4');
+const insights = await extractInsightsWithModel(
+  bike1Name,
+  bike2Name,
+  scrapedData,
+  undefined,
+  model
 );
 ```
 
@@ -47,50 +125,37 @@ import { extractInsightsWithRetry } from '@/lib/ai/factory';
 const insights = await extractInsightsWithRetry(
   bike1Name,
   bike2Name,
-  redditData,
-  xbhpData,
-  maxRetries // default: 3
+  scrapedData,
+  undefined,
+  3 // maxRetries
 );
 ```
 
-## Switching AI Providers
+### In UI Components
 
-### 1. Update Environment Variable
+```typescript
+import { getModelOptions, getDefaultModel } from '@/lib/ai/models/registry';
 
-In `.env.local`:
+// In your component
+const modelOptions = getModelOptions('extraction');
+const defaultModel = getDefaultModel('extraction');
 
-```env
-# Change this to switch providers
-AI_PROVIDER=claude    # Options: claude, openai, gemini
+const [selectedModelId, setSelectedModelId] = useState(defaultModel.id);
+
+// Render model selector
+{modelOptions.map(model => (
+  <button 
+    key={model.id}
+    onClick={() => setSelectedModelId(model.id)}
+    className={selectedModelId === model.id ? 'selected' : ''}
+  >
+    {model.name} - {model.description}
+    {model.badge && <Badge>{model.badge}</Badge>}
+  </button>
+))}
 ```
-
-### 2. Add Provider API Key
-
-```env
-# For Claude
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
-
-# For OpenAI (future)
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4-turbo-preview
-
-# For Gemini (future)
-GOOGLE_AI_API_KEY=...
-GOOGLE_AI_MODEL=gemini-1.5-pro
-```
-
-### 3. Restart Application
-
-```bash
-npm run dev
-```
-
-That's it! Your app will now use the new provider.
 
 ## Adding a New Provider
-
-Want to add OpenAI, Gemini, or another model? Follow these steps:
 
 ### Step 1: Create Provider Class
 
@@ -98,20 +163,16 @@ Create `src/lib/ai/providers/openai.ts`:
 
 ```typescript
 import OpenAI from 'openai';
-import { buildInsightExtractionPrompt } from '../prompts';
-import type { AIProvider } from '../provider-interface';
+import { BaseProvider } from './base-provider';
 import type { InsightExtractionResult } from '../../types';
 
-export class OpenAIProvider implements AIProvider {
-  name = "OpenAI GPT-4";
+export class OpenAIProvider extends BaseProvider {
+  readonly name = "OpenAI GPT-4";
+  readonly providerId = "openai";
   private client: OpenAI | null = null;
-  private model: string;
-  private maxTokens: number;
   
   constructor() {
-    this.model = process.env.OPENAI_MODEL || "gpt-4-turbo-preview";
-    this.maxTokens = parseInt(process.env.OPENAI_MAX_TOKENS || "4096");
-    
+    super();
     if (this.isConfigured()) {
       this.client = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY!,
@@ -125,168 +186,102 @@ export class OpenAIProvider implements AIProvider {
   
   getConfig() {
     return {
-      model: this.model,
-      maxTokens: this.maxTokens
+      model: process.env.OPENAI_MODEL || "gpt-4o",
+      maxTokens: 4096
     };
   }
   
-  async extractInsights(
-    bike1Name: string,
-    bike2Name: string,
-    redditData: any,
-    xbhpData?: any
-  ): Promise<InsightExtractionResult> {
-    if (!this.client) {
-      throw new Error("OpenAI API not configured");
-    }
-    
-    const startTime = Date.now();
-    
-    const prompt = buildInsightExtractionPrompt(
-      bike1Name,
-      bike2Name,
-      redditData,
-      xbhpData || { bike1: { threads: [] }, bike2: { threads: [] } }
-    );
-    
-    // Call OpenAI with JSON mode
-    const response = await this.client.chat.completions.create({
-      model: this.model,
-      messages: [{
-        role: "user",
-        content: prompt
-      }],
-      response_format: { type: "json_object" },
-      max_tokens: this.maxTokens
-    });
-    
-    const insights = JSON.parse(response.choices[0].message.content || "{}");
-    
-    // Calculate metadata and return
-    const processingTime = Date.now() - startTime;
-    
-    return {
-      bike1: insights.bike1,
-      bike2: insights.bike2,
-      metadata: {
-        extracted_at: new Date().toISOString(),
-        total_praises: insights.bike1.praises.length + insights.bike2.praises.length,
-        total_complaints: insights.bike1.complaints.length + insights.bike2.complaints.length,
-        total_quotes: /* calculate */,
-        processing_time_ms: processingTime
-      }
-    };
+  async extractInsights(/* ... */): Promise<InsightExtractionResult> {
+    // Implementation
+  }
+  
+  async generatePersonas(/* ... */) {
+    // Implementation
+  }
+  
+  async generateVerdicts(/* ... */) {
+    // Implementation
   }
 }
 ```
 
-### Step 2: Register in Factory
+### Step 2: Register Provider
 
-Update `src/lib/ai/factory.ts`:
+Update `src/lib/ai/providers/index.ts`:
 
 ```typescript
-import { OpenAIProvider } from './providers/openai';
+import { OpenAIProvider } from './openai';
 
-export function getAIProvider(): AIProvider {
-  const providerName = process.env.AI_PROVIDER || 'claude';
-  
-  switch (providerName.toLowerCase()) {
-    case 'claude':
-      return new ClaudeProvider();
-    
-    case 'openai':
-      return new OpenAIProvider();  // ✅ ADD THIS
-    
-    case 'gemini':
-      return new GeminiProvider();
-    
-    default:
-      return new ClaudeProvider();
-  }
+const providers: Record<ProviderName, ProviderFactory | null> = {
+  anthropic: () => new ClaudeProvider(),
+  openai: () => new OpenAIProvider(),  // Add this
+  google: null,
+  huggingface: null,
+  local: null,
+};
+```
+
+### Step 3: Enable Models
+
+In `models/registry.ts`, set `enabled: true` for OpenAI models:
+
+```typescript
+{
+  id: 'gpt-4o',
+  provider: 'openai',
+  // ...
+  enabled: true,  // Enable it
 }
 ```
 
-### Step 3: Install SDK
+### Step 4: Install SDK & Configure
 
 ```bash
 npm install openai
 ```
 
-### Step 4: Test
-
 ```env
-AI_PROVIDER=openai
+# .env.local
 OPENAI_API_KEY=sk-...
 ```
 
-Done! Your app now uses OpenAI instead of Claude.
+Done! OpenAI models will now appear in the UI and be available for use.
 
-## Provider Interface
+## Model Selection in API
 
-All providers must implement:
+The `/api/extract/insights` endpoint now accepts a `modelId` parameter:
 
 ```typescript
-interface AIProvider {
-  name: string;
-  
-  extractInsights(
-    bike1Name: string,
-    bike2Name: string,
-    redditData: any,
-    xbhpData?: any
-  ): Promise<InsightExtractionResult>;
-  
-  isConfigured(): boolean;
-  
-  getConfig(): {
-    model: string;
-    maxTokens: number;
-  };
+// Request body
+{
+  bike1Name: "KTM Duke 390",
+  bike2Name: "Bajaj Dominar 400",
+  youtubeData: { ... },
+  modelId: "claude-sonnet-4"  // Optional, defaults to extraction default
+}
+
+// Response includes model info
+{
+  success: true,
+  data: { ... },
+  meta: {
+    modelUsed: "claude-sonnet-4",
+    modelName: "Claude Sonnet 4",
+    modelQuality: "high"
+  }
 }
 ```
 
-## Benefits of This Architecture
+## Benefits
 
-### ✅ Easy Provider Switching
-Change one environment variable to switch AI models
-
-### ✅ No Code Changes
-Your application code stays the same
-
-### ✅ Type Safety
-TypeScript ensures all providers follow the same interface
-
-### ✅ Consistent Output
-All providers return the same InsightExtractionResult format
-
-### ✅ Testable
-Each provider can be tested independently
-
-### ✅ Extensible
-Add new providers without modifying existing code
-
-## Cost Comparison (per comparison)
-
-| Provider | Model | Input Cost | Output Cost | Total/Comparison |
-|----------|-------|------------|-------------|------------------|
-| Claude | Sonnet 4 | $3/M tokens | $15/M tokens | ~$0.21 |
-| OpenAI | GPT-4 Turbo | $10/M tokens | $30/M tokens | ~$0.70 |
-| Gemini | Pro 1.5 | $1.25/M tokens | $5/M tokens | ~$0.09 |
-
-*Based on ~60K input, ~2K output tokens per comparison*
-
-## Current Configuration
-
-Check your active configuration:
-
-```typescript
-import { getAIProvider } from '@/lib/ai/factory';
-
-const provider = getAIProvider();
-console.log(provider.name);        // "Claude (Anthropic)"
-console.log(provider.getConfig()); // { model: "claude-sonnet-4-20250514", maxTokens: 4096 }
-console.log(provider.isConfigured()); // true/false
-```
+| Feature | Before | After |
+|---------|--------|-------|
+| Add new model | Edit 5+ files | Add 1 registry entry |
+| Switch providers | Change env vars + code | Enable flag in registry |
+| UI model options | Hardcoded | Dynamic from registry |
+| API endpoints | Multiple | Single unified |
+| Future providers | Major refactor | Implement interface |
+| Cost tracking | Manual | Built into registry |
 
 ## Troubleshooting
 
@@ -294,41 +289,18 @@ console.log(provider.isConfigured()); // true/false
 - Check your `.env.local` has the correct API key
 - Restart dev server after changing `.env.local`
 
-### Error: "Unknown provider"
-- Check `AI_PROVIDER` value in `.env.local`
-- Valid options: `claude`, `openai`, `gemini`
+### Error: "Unknown model"
+- Check the `modelId` exists in the registry
+- Verify the model is `enabled: true`
 
-### Want to test without API calls?
-Create a `MockProvider` for development:
+### Error: "Provider not implemented"
+- The model's provider hasn't been implemented yet
+- Check `providers/index.ts` for available providers
 
-```typescript
-export class MockProvider implements AIProvider {
-  name = "Mock Provider";
-  
-  isConfigured() {
-    return true;
-  }
-  
-  getConfig() {
-    return { model: "mock", maxTokens: 0 };
-  }
-  
-  async extractInsights(/* ... */): Promise<InsightExtractionResult> {
-    // Return mock data
-    return { /* ... */ };
-  }
-}
-```
-
-## Future Providers
-
-Planned implementations:
-- [ ] OpenAI (GPT-4 Turbo, GPT-4o)
-- [ ] Google Gemini (Pro 1.5)
-- [ ] Anthropic Claude (Haiku for cost optimization)
-- [ ] Local models (Ollama, LM Studio)
+### Model not appearing in UI
+- Verify `enabled: true` in registry
+- Check the model has the required capability
 
 ---
 
-**This architecture makes your app future-proof and flexible!** 🚀
-
+**This architecture is future-proof and flexible!** 🚀

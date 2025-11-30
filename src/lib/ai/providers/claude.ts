@@ -1,6 +1,8 @@
 /**
  * Claude AI Provider Implementation
  * Uses Anthropic's Claude with Structured Outputs
+ * 
+ * Now extends BaseProvider for consistent interface across providers
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -15,17 +17,21 @@ import {
   buildSingleVerdictPrompt,
   VERDICT_SYSTEM_PROMPT
 } from "../prompts-optimized";
-import { getModelForTask } from "../model-selector";
+import { getModelForTask, getModelById, type ModelDefinition } from "../model-selector";
+import { getModelApiConfig, type TaskType } from "../models/registry";
+import { BaseProvider } from "./base-provider";
 import type { AIProvider } from "../provider-interface";
 import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona, BikeInsights, Verdict } from "../../types";
 
-export class ClaudeProvider implements AIProvider {
-  name = "Claude (Anthropic)";
+export class ClaudeProvider extends BaseProvider implements AIProvider {
+  readonly name = "Claude (Anthropic)";
+  readonly providerId = "anthropic";
   private client: Anthropic | null = null;
   private model: string;
   private maxTokens: number;
   
   constructor() {
+    super();
     this.model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
     this.maxTokens = parseInt(process.env.ANTHROPIC_MAX_TOKENS || "4096");
     
@@ -927,14 +933,14 @@ export class ClaudeProvider implements AIProvider {
       // Build optimized prompt with condensed data and few-shot examples
       const prompt = buildOptimizedPersonaPrompt(bike1Name, bike2Name, insights);
       
-      // Use Sonnet with optimized settings
-      const personaMaxTokens = 6144;
-      console.log(`[Claude-Optimized] Using Sonnet with ${personaMaxTokens} max tokens, temp 0.3`);
+      // Get model config from central registry
+      const modelConfig = getModelApiConfig('personas');
+      console.log(`[Claude-Optimized] Using ${modelConfig.model} with ${modelConfig.maxTokens} max tokens, temp ${modelConfig.temperature}`);
       
       const response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: personaMaxTokens,
-        temperature: 0.3, // Slight creativity for names/titles
+        model: modelConfig.model,
+        max_tokens: modelConfig.maxTokens,
+        temperature: modelConfig.temperature,
         system: PERSONA_SYSTEM_PROMPT,
         messages: [{
           role: "user",
@@ -1103,10 +1109,13 @@ export class ClaudeProvider implements AIProvider {
     // Build optimized prompt for single persona
     const prompt = buildSingleVerdictPrompt(bike1Name, bike2Name, persona, insights);
     
+    // Get model config from central registry
+    const modelConfig = getModelApiConfig('verdicts');
+    
     const response = await this.client!.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048, // Smaller since single verdict
-      temperature: 0.2, // Slight variety in reasoning
+      model: modelConfig.model,
+      max_tokens: modelConfig.maxTokens,
+      temperature: modelConfig.temperature,
       system: VERDICT_SYSTEM_PROMPT,
       messages: [{
         role: 'user',

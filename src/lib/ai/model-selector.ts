@@ -1,7 +1,12 @@
 /**
  * Model selection strategy for different tasks
- * Optimizes for speed vs quality tradeoffs
+ * Now uses the centralized model registry
+ * 
+ * This file is kept for backward compatibility with existing code
+ * New code should import directly from './models/registry'
  */
+
+import { getModelConfigForTask, getModelById, type ModelDefinition } from './models/registry';
 
 export interface ModelConfig {
   model: string;
@@ -10,33 +15,57 @@ export interface ModelConfig {
   useCase: string;
 }
 
+// Backward compatible MODEL_STRATEGY object
+// Dynamically generates from registry
 export const MODEL_STRATEGY = {
-  // Fast extraction - Haiku is 5-10x faster, perfect for structured data extraction
-  extraction: {
-    model: 'claude-3-5-haiku-20241022',
-    maxTokens: 4096,
-    temperature: 0, // Deterministic output
-    useCase: 'Structured data extraction from text'
-  } as ModelConfig,
-  
-  // Smart synthesis - Sonnet for nuanced analysis
-  synthesis: {
-    model: 'claude-sonnet-4-20250514',
-    maxTokens: 8192,
-    temperature: 0.3, // Slight creativity
-    useCase: 'Persona generation, verdicts, article writing'
-  } as ModelConfig,
-  
-  // Quality check - Haiku is enough for validation
-  validation: {
-    model: 'claude-3-5-haiku-20241022',
-    maxTokens: 2048,
-    temperature: 0,
-    useCase: 'JSON validation, quality checks'
-  } as ModelConfig
+  get extraction(): ModelConfig {
+    return getModelConfigForTask('extraction');
+  },
+  get synthesis(): ModelConfig {
+    return getModelConfigForTask('synthesis');
+  },
+  get validation(): ModelConfig {
+    return getModelConfigForTask('validation');
+  }
 };
 
+/**
+ * Get model config for a task (backward compatible)
+ */
 export function getModelForTask(task: 'extraction' | 'synthesis' | 'validation'): ModelConfig {
-  return MODEL_STRATEGY[task];
+  return getModelConfigForTask(task);
 }
+
+/**
+ * Get model config for a specific model ID
+ * New function to support model selection by ID
+ */
+export function getModelConfigById(modelId: string): ModelConfig | null {
+  const model = getModelById(modelId);
+  if (!model) return null;
+  
+  // Map speed to temperature
+  const temperatureMap: Record<string, number> = {
+    'fast': 0,
+    'medium': 0.3,
+    'slow': 0.3
+  };
+  
+  return {
+    model: model.modelString,
+    maxTokens: model.maxTokens,
+    temperature: temperatureMap[model.speed] || 0.3,
+    useCase: model.description
+  };
+}
+
+// Re-export types and functions from registry for convenience
+export { 
+  type ModelDefinition,
+  getModelById,
+  getEnabledModels,
+  getModelsForCapability,
+  getDefaultModel,
+  getModelOptions
+} from './models/registry';
 

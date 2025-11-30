@@ -1,9 +1,11 @@
 // Optimized Sonnet extraction API route with parallel processing
+// Now uses the centralized model registry
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { prepareBikeDataForSonnet, formatForSonnetPrompt } from '@/lib/scrapers/sonnet-data-prep';
 import { buildSonnetExtractionPrompt, SONNET_SYSTEM_PROMPT } from '@/lib/ai/sonnet-extraction-prompt';
+import { getModelById } from '@/lib/ai/models/registry';
 import type { BikeInsights, InsightExtractionResult, InsightExtractionResponse } from '@/lib/types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -11,9 +13,11 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes for Sonnet processing
 
+// Get Sonnet config from registry, fallback to hardcoded values
+const sonnetModel = getModelById('claude-sonnet-4');
 const SONNET_CONFIG = {
-  model: 'claude-sonnet-4-20250514',
-  maxTokens: 4096,
+  model: sonnetModel?.modelString || 'claude-sonnet-4-20250514',
+  maxTokens: sonnetModel?.maxTokens || 4096,
   temperature: 0.1,
 };
 

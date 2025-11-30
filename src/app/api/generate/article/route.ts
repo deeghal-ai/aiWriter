@@ -19,14 +19,13 @@ import { buildVerdictsPrompt } from '@/lib/ai/article-sections/verdicts';
 import { buildBottomLinePrompt } from '@/lib/ai/article-sections/bottom-line';
 import { buildCoherencePrompt, applyCoherenceEdits } from '@/lib/ai/article-coherence';
 import { checkArticleQuality } from '@/lib/ai/article-quality-check';
+import { getModelApiConfig } from '@/lib/ai/models/registry';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for article generation
 
-const SONNET_CONFIG = {
-  model: 'claude-sonnet-4-20250514',
-  temperature: 0.7, // Higher for creative writing
-};
+// Get model config from central registry
+const getArticleWritingConfig = () => getModelApiConfig('article_writing');
 
 interface ArticleGenerationRequest {
   bike1Name: string;
@@ -358,10 +357,12 @@ async function generateNarrativePlan(
     verdicts
   );
 
+  // Use writing model from central registry
+  const writingConfig = getArticleWritingConfig();
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
-    max_tokens: 2000,
-    temperature: SONNET_CONFIG.temperature,
+    model: writingConfig.model,
+    max_tokens: writingConfig.maxTokens,
+    temperature: writingConfig.temperature,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -437,10 +438,12 @@ async function generateSection(
       throw new Error(`Unknown section type: ${sectionType}`);
   }
 
+  // Use writing model from central registry
+  const sectionConfig = getArticleWritingConfig();
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
-    max_tokens: 2000,
-    temperature: SONNET_CONFIG.temperature,
+    model: sectionConfig.model,
+    max_tokens: sectionConfig.maxTokens,
+    temperature: sectionConfig.temperature,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -481,10 +484,12 @@ async function generateMatrixSection(
     allocatedQuotes
   );
 
+  // Use writing model from central registry
+  const matrixConfig = getArticleWritingConfig();
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
-    max_tokens: 1500,
-    temperature: SONNET_CONFIG.temperature,
+    model: matrixConfig.model,
+    max_tokens: 1500, // Smaller for individual matrix sections
+    temperature: matrixConfig.temperature,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -499,8 +504,10 @@ async function runCoherencePass(
 ): Promise<CoherenceEdits> {
   const prompt = buildCoherencePrompt(sections, narrativePlan);
 
+  // Use coherence model from central registry
+  const coherenceConfig = getArticleWritingConfig(); // Uses article_writing for coherence in non-streaming
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
+    model: coherenceConfig.model,
     max_tokens: 1500,
     temperature: 0.3, // Lower temperature for editing
     messages: [{ role: 'user', content: prompt }],

@@ -1,34 +1,40 @@
 /**
  * AI Provider Factory
  * Creates the appropriate AI provider based on configuration
+ * 
+ * Now uses the centralized provider registry for better extensibility
  */
 
 import { ClaudeProvider } from './providers/claude';
+import { getConfiguredProvider, getProviderForModel, isProviderAvailable } from './providers';
+import { getModelById, type ModelDefinition } from './models/registry';
 import type { AIProvider } from './provider-interface';
 import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona } from '../types';
 
 /**
  * Get the configured AI provider
+ * Uses environment variable AI_PROVIDER, defaults to Claude
  */
 export function getAIProvider(): AIProvider {
-  const providerName = process.env.AI_PROVIDER || 'claude';
-  
-  switch (providerName.toLowerCase()) {
-    case 'claude':
-      return new ClaudeProvider();
-    
-    case 'openai':
-      // Future: return new OpenAIProvider();
-      throw new Error('OpenAI provider not implemented yet. Use AI_PROVIDER=claude');
-    
-    case 'gemini':
-      // Future: return new GeminiProvider();
-      throw new Error('Gemini provider not implemented yet. Use AI_PROVIDER=claude');
-    
-    default:
-      console.warn(`Unknown AI provider: ${providerName}, falling back to Claude`);
-      return new ClaudeProvider();
+  return getConfiguredProvider() as AIProvider;
+}
+
+/**
+ * Get provider for a specific model ID
+ */
+export function getProviderForModelId(modelId: string): AIProvider {
+  const model = getModelById(modelId);
+  if (!model) {
+    console.warn(`[Factory] Unknown model: ${modelId}, falling back to configured provider`);
+    return getAIProvider();
   }
+  
+  if (!isProviderAvailable(model.provider)) {
+    console.warn(`[Factory] Provider ${model.provider} not available, falling back to configured provider`);
+    return getAIProvider();
+  }
+  
+  return getProviderForModel(model) as AIProvider;
 }
 
 /**
@@ -42,6 +48,33 @@ export async function extractInsights(
 ) {
   const provider = getAIProvider();
   return provider.extractInsights(bike1Name, bike2Name, redditData, xbhpData);
+}
+
+/**
+ * Extract insights using a specific model
+ * Routes to the appropriate provider based on model configuration
+ */
+export async function extractInsightsWithModel(
+  bike1Name: string,
+  bike2Name: string,
+  scrapedData: any,
+  xbhpData: any | undefined,
+  model: ModelDefinition
+): Promise<InsightExtractionResult> {
+  const provider = getProviderForModel(model);
+  
+  if (!provider.isConfigured()) {
+    throw new Error(`Provider ${model.provider} is not configured`);
+  }
+  
+  console.log(`[Factory] Using model: ${model.name} (${model.modelString})`);
+  
+  // Use optimized extraction for standard quality, standard for high/premium
+  if (model.quality === 'standard' && 'extractInsightsOptimized' in provider) {
+    return (provider as any).extractInsightsOptimized(bike1Name, bike2Name, scrapedData);
+  }
+  
+  return provider.extractInsights(bike1Name, bike2Name, scrapedData, xbhpData);
 }
 
 /**

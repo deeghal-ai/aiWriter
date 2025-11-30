@@ -12,9 +12,13 @@ import {
   RefreshCw, 
   Loader2, 
   CheckCircle2,
-  AlertCircle 
+  AlertCircle,
+  Zap,
+  Crown,
+  Star
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { getModelOptions, getDefaultModel, type ModelOption } from '@/lib/ai/models/registry';
 import type { InsightExtractionResult } from '@/lib/types';
 
 export function Step3Extract() {
@@ -32,25 +36,37 @@ export function Step3Extract() {
   const [error, setError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [useSonnet, setUseSonnet] = useState(true); // Use Sonnet by default for better quality
   
-  // Check for existing insights or auto-start extraction when component mounts
+  // Model selection - use registry to get default and available models
+  const modelOptions = getModelOptions('extraction');
+  const defaultModel = getDefaultModel('extraction');
+  const [selectedModelId, setSelectedModelId] = useState<string>(defaultModel?.id || 'claude-sonnet-4');
+  
+  // Check for existing insights when component mounts
+  // NOTE: We no longer auto-start - let user select model first
   useEffect(() => {
     if (!hasInitialized) {
       if (storedInsights) {
-        // Restore existing insights
+        // Restore existing insights from previous session
         setExtractedInsights(storedInsights);
         setHasStarted(true);
         setProgress(100);
-      } else if (comparison && (scrapedData.reddit || scrapedData.youtube) && !hasStarted) {
-        // Only start extraction if no existing insights
-        setHasStarted(true);
-        startExtraction();
       }
+      // No auto-start - show model selector and let user click "Start Extraction"
       setHasInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasInitialized, storedInsights, comparison, scrapedData.reddit, scrapedData.youtube, hasStarted]);
+  }, [hasInitialized, storedInsights]);
+  
+  // Handle restart - clears insights to show model selector again
+  const handleRestart = () => {
+    setExtractedInsights(null);
+    setProgress(0);
+    setHasStarted(false);
+    setError(null);
+    setInsights(null); // Clear store insights too
+    // Model selector will now show because extractedInsights is null
+  };
   
   const startExtraction = async () => {
     if (!comparison || (!scrapedData.reddit && !scrapedData.youtube)) {
@@ -62,15 +78,21 @@ export function Step3Extract() {
     setError(null);
     setProgress(0);
     
+    // Get selected model info for logging
+    const selectedModel = modelOptions.find(m => m.id === selectedModelId);
+    
     // Simulate progress
     const progressInterval = setInterval(() => {
       setProgress((prev) => Math.min(prev + 5, 90));
     }, 1000);
     
     try {
-      // Use Sonnet endpoint for better quality, or regular endpoint for speed
-      const endpoint = useSonnet ? '/api/extract/insights-sonnet' : '/api/extract/insights';
-      console.log(`[Extract] Using ${useSonnet ? 'Sonnet (quality)' : 'Haiku (speed)'} model`);
+      // Use unified endpoint with modelId parameter
+      // Sonnet-specific endpoint is kept for backward compatibility but unified endpoint handles all models
+      const useSonnetEndpoint = selectedModelId === 'claude-sonnet-4' || selectedModelId === 'claude-opus-4';
+      const endpoint = useSonnetEndpoint ? '/api/extract/insights-sonnet' : '/api/extract/insights';
+      
+      console.log(`[Extract] Using model: ${selectedModel?.name || selectedModelId}`);
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -80,7 +102,8 @@ export function Step3Extract() {
           bike2Name: comparison.bike2,
           redditData: scrapedData.reddit,
           youtubeData: scrapedData.youtube,
-          xbhpData: scrapedData.xbhp
+          xbhpData: scrapedData.xbhp,
+          modelId: selectedModelId  // Pass selected model
         })
       });
       
@@ -141,45 +164,56 @@ export function Step3Extract() {
         <Card className="mb-6 border-blue-200 bg-blue-50">
           <CardContent className="pt-6">
             <div className="space-y-3">
-              <h3 className="font-semibold text-blue-900">Choose Extraction Quality</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setUseSonnet(true)}
-                  className={`p-4 rounded-lg border-2 text-left transition ${
-                    useSonnet 
-                      ? 'border-blue-600 bg-blue-100' 
-                      : 'border-gray-300 bg-white hover:border-gray-400'
-                  }`}
-                >
-                  <div className="font-semibold text-lg">Sonnet (Quality)</div>
-                  <div className="text-sm mt-1">
-                    • 8-10 praise categories<br />
-                    • 6-8 complaint categories<br />
-                    • 40+ quotes<br />
-                    • Highly specific insights<br />
-                    • ~20 seconds
-                  </div>
-                  {useSonnet && <Badge className="mt-2 bg-blue-600">Recommended</Badge>}
-                </button>
-                
-                <button
-                  onClick={() => setUseSonnet(false)}
-                  className={`p-4 rounded-lg border-2 text-left transition ${
-                    !useSonnet 
-                      ? 'border-blue-600 bg-blue-100' 
-                      : 'border-gray-300 bg-white hover:border-gray-400'
-                  }`}
-                >
-                  <div className="font-semibold text-lg">Haiku (Speed)</div>
-                  <div className="text-sm mt-1">
-                    • 5 praise categories<br />
-                    • 5 complaint categories<br />
-                    • 13 quotes<br />
-                    • Generic insights<br />
-                    • ~14 seconds
-                  </div>
-                </button>
+              <h3 className="font-semibold text-blue-900">Select AI Model</h3>
+              <div className="grid gap-3">
+                {modelOptions.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => setSelectedModelId(model.id)}
+                    className={`p-4 rounded-lg border-2 text-left transition ${
+                      selectedModelId === model.id
+                        ? 'border-blue-600 bg-blue-100'
+                        : 'border-gray-300 bg-white hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold text-lg">{model.name}</div>
+                      {model.badge && (
+                        <Badge 
+                          variant={
+                            model.badge === 'recommended' ? 'default' :
+                            model.badge === 'fast' ? 'secondary' :
+                            model.badge === 'premium' ? 'destructive' : 'outline'
+                          }
+                          className="flex items-center gap-1"
+                        >
+                          {model.badge === 'fast' && <Zap className="w-3 h-3" />}
+                          {model.badge === 'premium' && <Crown className="w-3 h-3" />}
+                          {model.badge === 'recommended' && <Star className="w-3 h-3" />}
+                          {model.badge}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{model.description}</p>
+                    <div className="flex gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs">
+                        {model.speed === 'fast' ? '⚡ Fast' : model.speed === 'medium' ? '⏱️ Medium' : '🐢 Thorough'}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {model.quality === 'standard' ? '📝 Standard' : model.quality === 'high' ? '✨ High' : '👑 Premium'}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
               </div>
+              
+              <Button 
+                onClick={startExtraction} 
+                className="w-full mt-4"
+                disabled={isExtracting}
+              >
+                Start Extraction
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -194,12 +228,14 @@ export function Step3Extract() {
                 <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                 <div>
                   <p className="font-medium">
-                    Analyzing forum data with Claude {useSonnet ? 'Sonnet' : 'Haiku'}...
+                    Analyzing forum data with {modelOptions.find(m => m.id === selectedModelId)?.name || 'Claude'}...
                   </p>
                   <p className="text-sm text-slate-600">
-                    {useSonnet 
-                      ? 'Extracting comprehensive insights with high specificity (~20s)' 
-                      : 'Quick extraction for basic insights (~14s)'
+                    {modelOptions.find(m => m.id === selectedModelId)?.quality === 'standard'
+                      ? 'Quick extraction for basic insights (~14s)' 
+                      : modelOptions.find(m => m.id === selectedModelId)?.quality === 'premium'
+                      ? 'Premium extraction with maximum detail (~30s)'
+                      : 'Extracting comprehensive insights with high specificity (~20s)'
                     }
                   </p>
                 </div>
@@ -246,7 +282,7 @@ export function Step3Extract() {
                   <p className="font-medium text-green-900">Analysis Complete</p>
                 </div>
                 <Badge variant="outline">
-                  {useSonnet ? 'Sonnet Quality' : 'Haiku Speed'}
+                  {modelOptions.find(m => m.id === selectedModelId)?.name || 'Claude'}
                 </Badge>
               </div>
               
@@ -284,12 +320,12 @@ export function Step3Extract() {
                 <div>
                   <h3 className="font-semibold mb-1">Extraction Complete</h3>
                   <p className="text-sm text-slate-600">
-                    Want to re-analyze with fresh insights? Click to restart extraction.
+                    Re-analyze with a different model?
                   </p>
                 </div>
-                <Button onClick={startExtraction} variant="outline" className="gap-2" disabled={isExtracting}>
+                <Button onClick={handleRestart} variant="outline" className="gap-2" disabled={isExtracting}>
                   <RefreshCw className="h-4 w-4" />
-                  Restart Extraction
+                  Change Model & Re-extract
                 </Button>
               </div>
             </CardContent>

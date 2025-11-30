@@ -19,21 +19,15 @@ import { buildBottomLinePrompt } from '@/lib/ai/article-sections/bottom-line';
 import { buildCoherencePrompt, applyCoherenceEdits } from '@/lib/ai/article-coherence';
 import { checkArticleQuality } from '@/lib/ai/article-quality-check';
 import { buildCondensedContext } from '@/lib/ai/article-context-builder';
+import { getModelApiConfig } from '@/lib/ai/models/registry';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-// Use Sonnet for creative writing, but with optimized prompts
-const SONNET_CONFIG = {
-  model: 'claude-sonnet-4-20250514',
-  temperature: 0.7,
-};
-
-// Use Haiku for faster narrative planning (structured output)
-const HAIKU_CONFIG = {
-  model: 'claude-3-5-haiku-20241022',
-  temperature: 0.5,
-};
+// Get model configs from central registry
+const getArticleWritingConfig = () => getModelApiConfig('article_writing');
+const getArticlePlanningConfig = () => getModelApiConfig('article_planning');
+const getArticleCoherenceConfig = () => getModelApiConfig('article_coherence');
 
 interface ArticleGenerationRequest {
   bike1Name: string;
@@ -365,11 +359,12 @@ async function generateNarrativePlan(
     verdicts
   );
 
-  // Use Haiku for narrative planning (structured output, faster)
+  // Use planning model from registry (structured output, faster)
+  const planningConfig = getArticlePlanningConfig();
   const response = await client.messages.create({
-    model: HAIKU_CONFIG.model,
-    max_tokens: 2000,
-    temperature: HAIKU_CONFIG.temperature,
+    model: planningConfig.model,
+    max_tokens: planningConfig.maxTokens,
+    temperature: planningConfig.temperature,
     system: NARRATIVE_PLANNER_SYSTEM,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -437,10 +432,12 @@ async function generateSection(
       throw new Error(`Unknown section type: ${sectionType}`);
   }
 
+  // Use writing model from registry
+  const writingConfig = getArticleWritingConfig();
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
-    max_tokens: 2000,
-    temperature: SONNET_CONFIG.temperature,
+    model: writingConfig.model,
+    max_tokens: writingConfig.maxTokens,
+    temperature: writingConfig.temperature,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -468,10 +465,12 @@ async function generateMatrixSection(
     allocatedQuotes
   );
 
+  // Use writing model from registry
+  const matrixConfig = getArticleWritingConfig();
   const response = await client.messages.create({
-    model: SONNET_CONFIG.model,
-    max_tokens: 1500,
-    temperature: SONNET_CONFIG.temperature,
+    model: matrixConfig.model,
+    max_tokens: 1500, // Smaller for individual matrix sections
+    temperature: matrixConfig.temperature,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -486,11 +485,12 @@ async function runCoherencePass(
 ): Promise<CoherenceEdits> {
   const prompt = buildCoherencePrompt(sections, narrativePlan);
 
-  // Use Haiku for coherence check (structured output, faster)
+  // Use coherence model from registry (structured output, faster)
+  const coherenceConfig = getArticleCoherenceConfig();
   const response = await client.messages.create({
-    model: HAIKU_CONFIG.model,
-    max_tokens: 1500,
-    temperature: 0.3,
+    model: coherenceConfig.model,
+    max_tokens: coherenceConfig.maxTokens,
+    temperature: coherenceConfig.temperature,
     messages: [{ role: 'user', content: prompt }],
   });
 
