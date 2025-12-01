@@ -73,7 +73,7 @@ export function useStepCompletion(options: UseStepCompletionOptions = {}) {
         // Map data keys to appropriate store setters
         if (data.scrapedData) {
           Object.entries(data.scrapedData).forEach(([source, sourceData]) => {
-            setScrapedData(source as 'reddit' | 'xbhp' | 'youtube', sourceData);
+            setScrapedData(source as 'reddit' | 'xbhp' | 'youtube' | 'internal', sourceData);
           });
         }
         if (data.insights !== undefined) setInsights(data.insights);

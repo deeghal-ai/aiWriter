@@ -23,10 +23,12 @@ import type {
 } from './types';
 
 // Types for scraped data storage
+// Supports: youtube, reddit, internal (BikeDekho), xbhp
 interface ScrapedData {
   reddit?: any;
   xbhp?: any;
   youtube?: any;
+  internal?: any;  // BikeDekho internal data (user reviews, expert insights)
 }
 
 interface AppState {
@@ -90,8 +92,8 @@ interface AppState {
   markStepComplete: (step: number) => void;
   setComparison: (comparison: BikeComparison) => void;
   setScrapingProgress: (progress: ScrapingProgress[]) => void;
-  setScrapedData: (source: 'reddit' | 'xbhp' | 'youtube', data: any) => void;
-  getScrapedData: (source: 'reddit' | 'xbhp' | 'youtube') => any;
+  setScrapedData: (source: 'reddit' | 'xbhp' | 'youtube' | 'internal', data: any) => void;
+  getScrapedData: (source: 'reddit' | 'xbhp' | 'youtube' | 'internal') => any;
   setInsights: (insights: InsightExtractionResult | null) => void;
   setPersonas: (personas: PersonaGenerationResult | null) => void;
   setIsGeneratingPersonas: (isGenerating: boolean) => void;

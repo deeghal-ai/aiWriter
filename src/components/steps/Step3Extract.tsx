@@ -70,7 +70,9 @@ export function Step3Extract() {
   };
   
   const startExtraction = async () => {
-    if (!comparison || (!scrapedData.reddit && !scrapedData.youtube)) {
+    // Check if we have at least one data source
+    const hasData = scrapedData.reddit || scrapedData.youtube || scrapedData.internal || scrapedData.xbhp;
+    if (!comparison || !hasData) {
       setError("Missing scraped data. Please complete Step 2 first.");
       return;
     }
@@ -102,6 +104,7 @@ export function Step3Extract() {
           redditData: scrapedData.reddit,
           youtubeData: scrapedData.youtube,
           xbhpData: scrapedData.xbhp,
+          internalData: scrapedData.internal,  // BikeDekho internal data (future integration)
           modelId: selectedModelId  // Routes to appropriate extraction method
         })
       });
