@@ -22,7 +22,8 @@ export function Step1Input() {
     teamBhp: false,
     reddit: false,
     youtube: true,
-    instagram: false
+    instagram: false,
+    internal: false  // BikeDekho internal data
   });
   
   // Restore existing comparison data when returning to this step
@@ -105,7 +106,8 @@ export function Step1Input() {
             <div className="space-y-3">
               {[
                 { id: 'youtube', label: 'YouTube Reviews & Comments', description: 'Top videos with owner comments', recommended: true },
-                { id: 'reddit', label: 'Reddit r/IndianBikes', description: 'Forum discussions and experiences', recommended: true }
+                { id: 'reddit', label: 'Reddit r/IndianBikes', description: 'Forum discussions and experiences', recommended: true },
+                { id: 'internal', label: 'BikeDekho User Reviews', description: 'Verified owner reviews & expert insights', recommended: true, badge: 'Premium' }
               ].map((source) => (
                 <div key={source.id} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
                   <Checkbox
@@ -117,15 +119,18 @@ export function Step1Input() {
                     className="mt-0.5"
                   />
                   <div className="flex-1">
-                    <label
-                      htmlFor={source.id}
-                      className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
-                    >
-                      {source.label}
-                      {source.recommended && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Recommended</span>
-                      )}
-                    </label>
+<label
+                                      htmlFor={source.id}
+                                      className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
+                                    >
+                                      {source.label}
+                                      {source.recommended && !('badge' in source) && (
+                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Recommended</span>
+                                      )}
+                                      {'badge' in source && source.badge && (
+                                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">{source.badge}</span>
+                                      )}
+                                    </label>
                     <p className="text-xs text-slate-500 mt-1">{source.description}</p>
                   </div>
                 </div>

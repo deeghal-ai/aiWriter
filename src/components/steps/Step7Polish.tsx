@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,8 +14,16 @@ export function Step7Polish() {
   const markStepComplete = useAppStore((state) => state.markStepComplete);
   const setQualityChecks = useAppStore((state) => state.setQualityChecks);
   const saveComparison = useAppStore((state) => state.saveComparison);
+  const storedQualityChecks = useAppStore((state) => state.qualityChecks);
   
   const checks = mockQualityChecks;
+  
+  // Mark step as complete if quality checks already exist (loaded from store)
+  useEffect(() => {
+    if (storedQualityChecks && storedQualityChecks.length > 0) {
+      markStepComplete(7);
+    }
+  }, [storedQualityChecks, markStepComplete]);
   
   const handleNext = async () => {
     setQualityChecks(checks);

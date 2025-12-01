@@ -36,13 +36,16 @@ export function Step5Verdicts() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   
-  // Auto-start generation when personas are available
+  // Auto-start generation when personas are available, or mark complete if verdicts exist
   useEffect(() => {
     if (personas && insights && !verdicts && !isGeneratingVerdicts) {
       startGeneration();
+    } else if (verdicts) {
+      // Existing verdicts loaded - mark step as complete so it remains accessible
+      markStepComplete(5);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personas, insights]);
+  }, [personas, insights, verdicts]);
   
   // Progress animation
   useEffect(() => {

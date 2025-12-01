@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -43,10 +43,19 @@ export default function ComparisonPage() {
     setComparisonId,
   } = useAppStore();
 
+  // Use ref to track if we've already initialized for this ID
+  // This prevents re-running loadComparison on every render
+  const initializedIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
+    const id = params.id as string;
+    
+    // Skip if we've already initialized for this ID
+    if (initializedIdRef.current === id) {
+      return;
+    }
+    
     const initializeWorkspace = async () => {
-      const id = params.id as string;
-      
       setLoading(true);
       setError(null);
       
@@ -63,6 +72,8 @@ export default function ComparisonPage() {
             setError('Comparison not found or failed to load');
           }
         }
+        // Mark this ID as initialized
+        initializedIdRef.current = id;
       } catch (err) {
         console.error('Error initializing workspace:', err);
         setError('Failed to load comparison');
@@ -72,7 +83,8 @@ export default function ComparisonPage() {
     };
 
     initializeWorkspace();
-  }, [params.id, loadComparison, resetWorkflow, setComparisonId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]); // Only re-run when the URL ID changes
 
   // Handle back navigation
   const handleBack = () => {

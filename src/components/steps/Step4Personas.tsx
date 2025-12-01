@@ -37,13 +37,16 @@ export function Step4Personas() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   
-  // Auto-start generation when insights are available
+  // Auto-start generation when insights are available, or mark complete if personas exist
   useEffect(() => {
     if (insights && !personas && !isGeneratingPersonas) {
       startGeneration();
+    } else if (personas) {
+      // Existing personas loaded - mark step as complete so it remains accessible
+      markStepComplete(4);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [insights]);
+  }, [insights, personas]);
   
   // Progress animation
   useEffect(() => {

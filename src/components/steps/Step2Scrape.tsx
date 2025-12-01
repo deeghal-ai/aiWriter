@@ -37,6 +37,9 @@ export function Step2Scrape() {
     if (comparison?.researchSources?.reddit) {
       statuses.push({ source: 'Reddit r/IndianBikes', status: 'pending' });
     }
+    if (comparison?.researchSources?.internal) {
+      statuses.push({ source: 'BikeDekho Reviews', status: 'pending' });
+    }
     // Default to YouTube if nothing selected
     if (statuses.length === 0) {
       statuses.push({ source: 'YouTube Reviews', status: 'pending' });
@@ -61,8 +64,10 @@ export function Step2Scrape() {
     // Check if we already have scraped data for selected sources
     const existingYouTubeData = scrapedData.youtube;
     const existingRedditData = scrapedData.reddit;
+    const existingInternalData = scrapedData.internal;
     const selectedYoutube = comparison?.researchSources?.youtube;
     const selectedReddit = comparison?.researchSources?.reddit;
+    const selectedInternal = comparison?.researchSources?.internal;
     
     // Build restored statuses from existing data
     const restoredStatuses: ScrapingStatus[] = [];
@@ -102,6 +107,23 @@ export function Step2Scrape() {
       }
     }
     
+    if (selectedInternal) {
+      if (existingInternalData) {
+        restoredStatuses.push({
+          source: 'BikeDekho Reviews', 
+          status: 'complete',
+          data: existingInternalData,
+          stats: {
+            posts: (existingInternalData.bike1?.reviews?.length || 0) + (existingInternalData.bike2?.reviews?.length || 0),
+            comments: 0  // Internal reviews don't have comments in the same way
+          }
+        });
+        hasExistingData = true;
+      } else {
+        restoredStatuses.push({ source: 'BikeDekho Reviews', status: 'pending' });
+      }
+    }
+    
     // Default to YouTube if nothing selected
     if (restoredStatuses.length === 0) {
       restoredStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
@@ -115,6 +137,8 @@ export function Step2Scrape() {
     if (allComplete && hasExistingData) {
       // All data exists, just display it
       setIsComplete(true);
+      // Mark step as complete so it remains accessible when navigating away
+      markStepComplete(2);
     } else if (!hasExistingData) {
       // No existing data at all, start scraping
       startScraping();
@@ -124,6 +148,8 @@ export function Step2Scrape() {
       const anyComplete = restoredStatuses.some(s => s.status === 'complete');
       if (anyComplete) {
         setIsComplete(true);
+        // Mark step as complete so it remains accessible when navigating away
+        markStepComplete(2);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,6 +208,64 @@ export function Step2Scrape() {
     } catch (error) {
       console.error('Reddit scraping error:', error);
       updateStatus('Reddit r/IndianBikes', {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  };
+  
+  const scrapeInternal = async () => {
+    if (!comparison) return;
+    
+    updateStatus('BikeDekho Reviews', { status: 'in-progress' });
+    
+    try {
+      const response = await fetch('/api/scrape/internal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bike1: comparison.bike1,
+          bike2: comparison.bike2
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        // Check if API is not configured
+        if (result.configRequired) {
+          throw new Error('BikeDekho API not configured. Set BIKEDEKHO_API_URL in .env.local');
+        }
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+      
+      const bike1Reviews = result.data.bike1?.reviews?.length || 0;
+      const bike2Reviews = result.data.bike2?.reviews?.length || 0;
+      const isMockData = result.data.metadata?.isMockData;
+      
+      updateStatus('BikeDekho Reviews', {
+        status: 'complete',
+        data: result.data,
+        stats: {
+          posts: bike1Reviews + bike2Reviews,
+          comments: 0
+        },
+        message: isMockData ? 'Using mock data (API not configured)' : undefined
+      });
+      
+      setScrapedData('internal', result.data);
+      
+      // Auto-save after successful scraping
+      try {
+        await saveComparison();
+        console.log('[Scrape] Auto-saved after Internal data fetch');
+      } catch (saveError) {
+        console.error('[Scrape] Auto-save failed after Internal data fetch:', saveError);
+      }
+      
+    } catch (error) {
+      console.error('Internal data fetch error:', error);
+      updateStatus('BikeDekho Reviews', {
         status: 'error',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -258,6 +342,7 @@ export function Step2Scrape() {
     
     const selectedYoutube = comparison?.researchSources?.youtube;
     const selectedReddit = comparison?.researchSources?.reddit;
+    const selectedInternal = comparison?.researchSources?.internal;
     
     // Run scraping for selected sources in parallel
     const scrapingPromises: Promise<void>[] = [];
@@ -268,6 +353,10 @@ export function Step2Scrape() {
     
     if (selectedReddit && !scrapedData.reddit) {
       scrapingPromises.push(scrapeReddit());
+    }
+    
+    if (selectedInternal && !scrapedData.internal) {
+      scrapingPromises.push(scrapeInternal());
     }
     
     // If no sources selected, default to YouTube
@@ -286,6 +375,49 @@ export function Step2Scrape() {
       const hasSuccess = prev.some(s => s.status === 'complete');
       if (hasSuccess) {
         setIsComplete(true);
+        // Mark step as complete so it remains accessible when navigating away
+        markStepComplete(2);
+      }
+      return prev;
+    });
+  };
+  
+  // Start scraping for specific sources (used by restart)
+  const startScrapingForSources = async (sourceStatuses: ScrapingStatus[]) => {
+    if (isScrapingInProgress.current) {
+      console.log('[Scrape] Already in progress, skipping duplicate call');
+      return;
+    }
+    isScrapingInProgress.current = true;
+    
+    // Run scraping only for the specified sources
+    const scrapingPromises: Promise<void>[] = [];
+    
+    sourceStatuses.forEach(s => {
+      if (s.source === 'YouTube Reviews') {
+        scrapingPromises.push(scrapeYouTube());
+      }
+      if (s.source === 'Reddit r/IndianBikes') {
+        scrapingPromises.push(scrapeReddit());
+      }
+      if (s.source === 'BikeDekho Reviews') {
+        scrapingPromises.push(scrapeInternal());
+      }
+    });
+    
+    // Wait for all scraping to complete
+    await Promise.all(scrapingPromises);
+    
+    // Mark scraping as complete
+    isScrapingInProgress.current = false;
+    
+    // Check if scraping completed successfully
+    setStatuses(prev => {
+      const hasSuccess = prev.some(s => s.status === 'complete');
+      if (hasSuccess) {
+        setIsComplete(true);
+        // Mark step as complete so it remains accessible when navigating away
+        markStepComplete(2);
       }
       return prev;
     });
@@ -295,31 +427,34 @@ export function Step2Scrape() {
     // Reset scraping progress flag
     isScrapingInProgress.current = false;
     
-    // Reset statuses based on selected sources
-    const newStatuses: ScrapingStatus[] = [];
-    if (comparison?.researchSources?.youtube) {
-      newStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
-    }
-    if (comparison?.researchSources?.reddit) {
-      newStatuses.push({ source: 'Reddit r/IndianBikes', status: 'pending' });
-    }
-    if (newStatuses.length === 0) {
-      newStatuses.push({ source: 'YouTube Reviews', status: 'pending' });
-    }
+    // IMPORTANT: Restart only the sources that were ALREADY shown in the current status list
+    // This ensures we don't accidentally scrape sources that weren't originally selected
+    const newStatuses = statuses.map(s => ({
+      ...s,
+      status: 'pending' as const,
+      data: undefined,
+      stats: undefined,
+      message: undefined
+    }));
     
     setStatuses(newStatuses);
     setIsComplete(false);
     
-    // Clear existing scraped data for selected sources
-    if (comparison?.researchSources?.youtube) {
-      setScrapedData('youtube', undefined);
-    }
-    if (comparison?.researchSources?.reddit) {
-      setScrapedData('reddit', undefined);
-    }
+    // Clear existing scraped data only for sources that were shown
+    statuses.forEach(s => {
+      if (s.source === 'YouTube Reviews') {
+        setScrapedData('youtube', undefined);
+      }
+      if (s.source === 'Reddit r/IndianBikes') {
+        setScrapedData('reddit', undefined);
+      }
+      if (s.source === 'BikeDekho Reviews') {
+        setScrapedData('internal', undefined);
+      }
+    });
     
     // Start fresh scraping after a short delay to let state update
-    setTimeout(() => startScraping(), 100);
+    setTimeout(() => startScrapingForSources(newStatuses), 100);
   };
   
   const handleNext = () => {
@@ -550,10 +685,11 @@ function ScrapedDataView({
             const bike2Data = status.data.bike2;
             const sourceKey = status.source.replace(/\s+/g, '-');
             
-            // Handle both Reddit (posts) and YouTube (videos) formats
-            const bike1Posts = bike1Data?.posts || bike1Data?.videos || [];
-            const bike2Posts = bike2Data?.posts || bike2Data?.videos || [];
+            // Handle Reddit (posts), YouTube (videos), and Internal (reviews) formats
+            const bike1Posts = bike1Data?.posts || bike1Data?.videos || bike1Data?.reviews || [];
+            const bike2Posts = bike2Data?.posts || bike2Data?.videos || bike2Data?.reviews || [];
             const isYouTube = status.source.includes('YouTube');
+            const isInternal = status.source.includes('BikeDekho');
             
             const bike1Visible = visiblePosts[`${sourceKey}-bike1`] || INITIAL_POSTS;
             const bike2Visible = visiblePosts[`${sourceKey}-bike2`] || INITIAL_POSTS;
@@ -595,7 +731,10 @@ function ScrapedDataView({
                                     {post.title}
                                   </p>
                                   <p className="text-xs text-slate-500">
-                                    {isYouTube ? post.channelTitle : post.author} • {post.comments?.length || 0} comments
+                                    {isYouTube ? post.channelTitle : isInternal ? (post.author?.name || 'BikeDekho User') : post.author}
+                                    {isInternal && post.author?.isVerifiedOwner && <span className="ml-1 text-green-600">✓ Verified</span>}
+                                    {!isInternal && ` • ${post.comments?.length || 0} comments`}
+                                    {isInternal && post.rating && ` • ⭐ ${post.rating}/5`}
                                   </p>
                                 </div>
                                 {isExpanded ? (
@@ -634,10 +773,49 @@ function ScrapedDataView({
                                   </div>
                                 )}
                                 
-                                {!isYouTube && post.selftext && (
+                                {!isYouTube && !isInternal && post.selftext && (
                                   <div className="text-sm text-slate-700 bg-white p-3 rounded">
                                     <p className="font-medium text-xs text-slate-500 mb-2">POST CONTENT:</p>
                                     <p className="whitespace-pre-wrap">{post.selftext}</p>
+                                  </div>
+                                )}
+                                
+                                {isInternal && post.content && (
+                                  <div className="text-sm text-slate-700 bg-white p-3 rounded">
+                                    <p className="font-medium text-xs text-slate-500 mb-2">REVIEW:</p>
+                                    <p className="whitespace-pre-wrap">{post.content}</p>
+                                    
+                                    {post.author?.ownershipDuration && (
+                                      <p className="text-xs text-slate-500 mt-2">
+                                        📅 Ownership: {post.author.ownershipDuration}
+                                        {post.author?.kmsDriven && ` • ${post.author.kmsDriven.toLocaleString()} km driven`}
+                                      </p>
+                                    )}
+                                    
+                                    {(post.pros?.length > 0 || post.cons?.length > 0) && (
+                                      <div className="mt-3 pt-3 border-t grid grid-cols-2 gap-4">
+                                        {post.pros?.length > 0 && (
+                                          <div>
+                                            <p className="font-medium text-xs text-green-600 mb-1">✓ PROS</p>
+                                            <ul className="text-xs space-y-1">
+                                              {post.pros.map((pro: string, i: number) => (
+                                                <li key={i} className="text-slate-600">• {pro}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                        {post.cons?.length > 0 && (
+                                          <div>
+                                            <p className="font-medium text-xs text-red-600 mb-1">✗ CONS</p>
+                                            <ul className="text-xs space-y-1">
+                                              {post.cons.map((con: string, i: number) => (
+                                                <li key={i} className="text-slate-600">• {con}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                                 
@@ -707,7 +885,10 @@ function ScrapedDataView({
                                     {post.title}
                                   </p>
                                   <p className="text-xs text-slate-500">
-                                    {isYouTube ? post.channelTitle : post.author} • {post.comments?.length || 0} comments
+                                    {isYouTube ? post.channelTitle : isInternal ? (post.author?.name || 'BikeDekho User') : post.author}
+                                    {isInternal && post.author?.isVerifiedOwner && <span className="ml-1 text-green-600">✓ Verified</span>}
+                                    {!isInternal && ` • ${post.comments?.length || 0} comments`}
+                                    {isInternal && post.rating && ` • ⭐ ${post.rating}/5`}
                                   </p>
                                 </div>
                                 {isExpanded ? (
@@ -746,10 +927,49 @@ function ScrapedDataView({
                                   </div>
                                 )}
                                 
-                                {!isYouTube && post.selftext && (
+                                {!isYouTube && !isInternal && post.selftext && (
                                   <div className="text-sm text-slate-700 bg-white p-3 rounded">
                                     <p className="font-medium text-xs text-slate-500 mb-2">POST CONTENT:</p>
                                     <p className="whitespace-pre-wrap">{post.selftext}</p>
+                                  </div>
+                                )}
+                                
+                                {isInternal && post.content && (
+                                  <div className="text-sm text-slate-700 bg-white p-3 rounded">
+                                    <p className="font-medium text-xs text-slate-500 mb-2">REVIEW:</p>
+                                    <p className="whitespace-pre-wrap">{post.content}</p>
+                                    
+                                    {post.author?.ownershipDuration && (
+                                      <p className="text-xs text-slate-500 mt-2">
+                                        📅 Ownership: {post.author.ownershipDuration}
+                                        {post.author?.kmsDriven && ` • ${post.author.kmsDriven.toLocaleString()} km driven`}
+                                      </p>
+                                    )}
+                                    
+                                    {(post.pros?.length > 0 || post.cons?.length > 0) && (
+                                      <div className="mt-3 pt-3 border-t grid grid-cols-2 gap-4">
+                                        {post.pros?.length > 0 && (
+                                          <div>
+                                            <p className="font-medium text-xs text-green-600 mb-1">✓ PROS</p>
+                                            <ul className="text-xs space-y-1">
+                                              {post.pros.map((pro: string, i: number) => (
+                                                <li key={i} className="text-slate-600">• {pro}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                        {post.cons?.length > 0 && (
+                                          <div>
+                                            <p className="font-medium text-xs text-red-600 mb-1">✗ CONS</p>
+                                            <ul className="text-xs space-y-1">
+                                              {post.cons.map((con: string, i: number) => (
+                                                <li key={i} className="text-slate-600">• {con}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                                 

@@ -165,13 +165,38 @@ export const useAppStore = create<AppState>()((set, get) => ({
         comparison: data.bike1_name && data.bike2_name ? {
           bike1: data.bike1_name,
           bike2: data.bike2_name,
-          researchSources: {
-            xbhp: true,
-            teamBhp: false,
-            reddit: true,
-            youtube: true,
-            instagram: false,
-          },
+          // Infer research sources from scraped data if available
+          // This preserves the user's original selection when loading saved comparisons
+          researchSources: (() => {
+            const hasAnyScrapedData = data.scraped_data && (
+              data.scraped_data.youtube || 
+              data.scraped_data.reddit || 
+              data.scraped_data.internal || 
+              data.scraped_data.xbhp
+            );
+            
+            // If we have scraped data, infer sources from what was scraped
+            if (hasAnyScrapedData) {
+              return {
+                xbhp: !!data.scraped_data?.xbhp,
+                teamBhp: false,
+                reddit: !!data.scraped_data?.reddit,
+                youtube: !!data.scraped_data?.youtube,
+                instagram: false,
+                internal: !!data.scraped_data?.internal,
+              };
+            }
+            
+            // Otherwise, use defaults (YouTube enabled for new comparisons)
+            return {
+              xbhp: false,
+              teamBhp: false,
+              reddit: false,
+              youtube: true,
+              instagram: false,
+              internal: false,
+            };
+          })(),
         } : null,
         scrapedData: data.scraped_data || {},
         insights: data.insights,

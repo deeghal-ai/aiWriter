@@ -72,3 +72,15 @@ export {
 // Re-export internal types for future integration
 export type { InternalReview, InternalBikeEntry } from './normalizers/internal';
 
+// Internal API integration
+export {
+  INTERNAL_API_BASE_URL,
+  isInternalApiConfigured,
+  getInternalApiStatus,
+  fetchInternalData,
+  USE_MOCK_DATA,
+  getMockInternalData
+} from './internal-api';
+
+export type { InternalApiResponse, InternalBikeData } from './internal-api';
+

@@ -17,6 +17,7 @@ export interface BikeComparison {
     reddit: boolean;
     youtube: boolean;
     instagram: boolean;
+    internal: boolean;  // BikeDekho internal reviews & expert insights
   };
 }
 

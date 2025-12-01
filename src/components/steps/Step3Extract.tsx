@@ -52,6 +52,8 @@ export function Step3Extract() {
         setExtractedInsights(storedInsights);
         setHasStarted(true);
         setProgress(100);
+        // Mark step as complete so it remains accessible when navigating away
+        markStepComplete(3);
       }
       // No auto-start - show model selector and let user click "Start Extraction"
       setHasInitialized(true);
@@ -127,6 +129,8 @@ export function Step3Extract() {
       setExtractedInsights(result.data);
       setInsights(result.data);
       setError(null); // Clear error last to ensure clean state
+      // Mark step as complete so it remains accessible when navigating away
+      markStepComplete(3);
       
       // Auto-save after successful insights extraction
       try {
