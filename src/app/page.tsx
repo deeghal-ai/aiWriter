@@ -168,7 +168,7 @@ export default function HomePage() {
               <Bike className="w-8 h-8 text-blue-600" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">BikeDekho AI Writer</h1>
+              <h1 className="text-3xl font-bold text-gray-900">BikeDekho AI Writing assistant</h1>
               <p className="text-gray-600 mt-1">Create research-driven bike comparison articles</p>
             </div>
           </div>
