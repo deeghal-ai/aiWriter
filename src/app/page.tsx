@@ -163,16 +163,15 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto p-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Image 
-                src="/bike_dekho_logo.png" 
-                alt="BikeDekho Logo" 
-                width={32} 
-                height={32}
-                className="object-contain"
-              />
-            </div>
+          <div className="flex items-center gap-4">
+            <Image 
+              src="/bike_dekho_logo.png" 
+              alt="BikeDekho Logo" 
+              width={72} 
+              height={72}
+              className="object-contain"
+              priority
+            />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">BikeDekho AI Writing assistant</h1>
               <p className="text-gray-600 mt-1">Create research-driven bike comparison articles</p>
