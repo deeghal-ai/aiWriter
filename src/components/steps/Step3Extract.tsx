@@ -28,6 +28,7 @@ export function Step3Extract() {
   const markStepComplete = useAppStore((state) => state.markStepComplete);
   const setInsights = useAppStore((state) => state.setInsights);
   const storedInsights = useAppStore((state) => state.insights);
+  const saveComparison = useAppStore((state) => state.saveComparison);
   
   const [selectedBike, setSelectedBike] = useState<'bike1' | 'bike2'>('bike1');
   const [isExtracting, setIsExtracting] = useState(false);
@@ -123,6 +124,14 @@ export function Step3Extract() {
       setExtractedInsights(result.data);
       setInsights(result.data);
       setError(null); // Clear error last to ensure clean state
+      
+      // Auto-save after successful insights extraction
+      try {
+        await saveComparison();
+        console.log('[Extract] Auto-saved after insights extraction');
+      } catch (saveError) {
+        console.error('[Extract] Auto-save failed after insights extraction:', saveError);
+      }
       
     } catch (err: any) {
       console.error('Extraction error:', err);

@@ -30,6 +30,7 @@ export function Step6Article() {
   const setStoredIsGenerating = useAppStore((state) => state.setIsGeneratingArticle);
   const setStoredPhase = useAppStore((state) => state.setArticleGenerationPhase);
   const resetArticleGeneration = useAppStore((state) => state.resetArticleGeneration);
+  const saveComparison = useAppStore((state) => state.saveComparison);
 
   const bike1Name = comparison?.bike1 || '';
   const bike2Name = comparison?.bike2 || '';
@@ -178,6 +179,14 @@ export function Step6Article() {
                   setStoredIsGenerating(false);
                   setStoredPhase(4); // Mark as fully complete
                   markStepComplete(6); // Mark step 6 as complete so it remains accessible
+                  
+                  // Auto-save after successful article generation
+                  try {
+                    await saveComparison();
+                    console.log('[Article] Auto-saved after article generation');
+                  } catch (saveError) {
+                    console.error('[Article] Auto-save failed after article generation:', saveError);
+                  }
                 }
               }
             } catch (parseError) {

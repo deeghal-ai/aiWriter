@@ -12,12 +12,22 @@ export function Step7Polish() {
   const setCurrentStep = useAppStore((state) => state.setCurrentStep);
   const markStepComplete = useAppStore((state) => state.markStepComplete);
   const setQualityChecks = useAppStore((state) => state.setQualityChecks);
+  const saveComparison = useAppStore((state) => state.saveComparison);
   
   const checks = mockQualityChecks;
   
-  const handleNext = () => {
+  const handleNext = async () => {
     setQualityChecks(checks);
     markStepComplete(7);
+    
+    // Auto-save after quality checks
+    try {
+      await saveComparison();
+      console.log('[Polish] Auto-saved after quality checks');
+    } catch (saveError) {
+      console.error('[Polish] Auto-save failed after quality checks:', saveError);
+    }
+    
     setCurrentStep(8);
   };
   

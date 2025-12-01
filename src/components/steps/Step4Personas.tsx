@@ -30,7 +30,8 @@ export function Step4Personas() {
     setPersonas,
     setIsGeneratingPersonas,
     setCurrentStep,
-    markStepComplete
+    markStepComplete,
+    saveComparison
   } = useAppStore();
   
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +91,14 @@ export function Step4Personas() {
       
       setPersonas(data.data);
       markStepComplete(4);
+      
+      // Auto-save after successful persona generation
+      try {
+        await saveComparison();
+        console.log('[Personas] Auto-saved after persona generation');
+      } catch (saveError) {
+        console.error('[Personas] Auto-save failed after persona generation:', saveError);
+      }
       
     } catch (err: any) {
       console.error('Persona generation error:', err);

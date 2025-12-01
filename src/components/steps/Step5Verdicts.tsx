@@ -29,7 +29,8 @@ export function Step5Verdicts() {
     setVerdicts,
     setIsGeneratingVerdicts,
     setCurrentStep,
-    markStepComplete
+    markStepComplete,
+    saveComparison
   } = useAppStore();
   
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +91,14 @@ export function Step5Verdicts() {
       
       setVerdicts(data.data);
       markStepComplete(5);
+      
+      // Auto-save after successful verdict generation
+      try {
+        await saveComparison();
+        console.log('[Verdicts] Auto-saved after verdict generation');
+      } catch (saveError) {
+        console.error('[Verdicts] Auto-save failed after verdict generation:', saveError);
+      }
       
     } catch (err: any) {
       console.error('Verdict generation error:', err);

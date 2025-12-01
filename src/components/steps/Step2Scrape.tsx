@@ -26,6 +26,7 @@ export function Step2Scrape() {
   const comparison = useAppStore((state) => state.comparison);
   const setScrapedData = useAppStore((state) => state.setScrapedData);
   const scrapedData = useAppStore((state) => state.scrapedData);
+  const saveComparison = useAppStore((state) => state.saveComparison);
   
   // Initialize statuses based on selected sources
   const getInitialStatuses = (): ScrapingStatus[] => {
@@ -170,6 +171,14 @@ export function Step2Scrape() {
       
       setScrapedData('reddit', result.data);
       
+      // Auto-save after successful scraping
+      try {
+        await saveComparison();
+        console.log('[Scrape] Auto-saved after Reddit scraping');
+      } catch (saveError) {
+        console.error('[Scrape] Auto-save failed after Reddit scraping:', saveError);
+      }
+      
     } catch (error) {
       console.error('Reddit scraping error:', error);
       updateStatus('Reddit r/IndianBikes', {
@@ -214,6 +223,14 @@ export function Step2Scrape() {
       });
       
       setScrapedData('youtube', result.data);
+      
+      // Auto-save after successful scraping
+      try {
+        await saveComparison();
+        console.log('[Scrape] Auto-saved after YouTube scraping');
+      } catch (saveError) {
+        console.error('[Scrape] Auto-save failed after YouTube scraping:', saveError);
+      }
       
     } catch (error) {
       console.error('YouTube scraping error:', error);
