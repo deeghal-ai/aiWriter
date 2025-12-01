@@ -19,9 +19,9 @@ import {
   CheckCircle2, 
   Trash2, 
   Loader2,
-  AlertCircle,
-  Bike
+  AlertCircle
 } from 'lucide-react';
+import Image from 'next/image';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -165,7 +165,13 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Bike className="w-8 h-8 text-blue-600" />
+              <Image 
+                src="/bike_dekho_logo.png" 
+                alt="BikeDekho Logo" 
+                width={32} 
+                height={32}
+                className="object-contain"
+              />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">BikeDekho AI Writing assistant</h1>
