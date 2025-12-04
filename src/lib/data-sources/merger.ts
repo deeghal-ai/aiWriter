@@ -152,8 +152,9 @@ export function mergeComparisonData(
 /**
  * Process raw scraped data from multiple sources and merge
  * This is the main entry point for the insights extraction route
+ * Now async to support Haiku summarization of long transcripts
  */
-export function processAndMergeScrapedData(
+export async function processAndMergeScrapedData(
   scrapedData: {
     youtube?: any;
     reddit?: any;
@@ -163,13 +164,23 @@ export function processAndMergeScrapedData(
   bike1Name: string,
   bike2Name: string,
   strategy: MergeStrategy = DEFAULT_MERGE_STRATEGY
-): DataMergeResult {
+): Promise<DataMergeResult> {
   const bike1Sources: Array<{ sourceId: DataSourceId; data: NormalizedBikeData }> = [];
   const bike2Sources: Array<{ sourceId: DataSourceId; data: NormalizedBikeData }> = [];
   
-  // Process YouTube data
+  // Process YouTube data (with async Haiku summarization for long transcripts)
   if (scrapedData.youtube) {
-    const youtubeNormalizer = getNormalizer('youtube');
+    const youtubeNormalizer = getNormalizer('youtube') as any;
+    
+    // Pre-process with Haiku summarization if available
+    if (scrapedData.youtube.bike1 && youtubeNormalizer.preprocessWithSummarization) {
+      console.log(`[Merger] Pre-processing ${bike1Name} YouTube data with Haiku...`);
+      await youtubeNormalizer.preprocessWithSummarization(scrapedData.youtube.bike1, bike1Name);
+    }
+    if (scrapedData.youtube.bike2 && youtubeNormalizer.preprocessWithSummarization) {
+      console.log(`[Merger] Pre-processing ${bike2Name} YouTube data with Haiku...`);
+      await youtubeNormalizer.preprocessWithSummarization(scrapedData.youtube.bike2, bike2Name);
+    }
     
     if (scrapedData.youtube.bike1) {
       bike1Sources.push({

@@ -5,7 +5,7 @@ import { scrapeYouTubeForComparison } from '@/lib/scrapers/youtube-scraper';
 import { scrapeYouTubeForComparisonEnhanced } from '@/lib/scrapers/youtube-scraper-enhanced';
 import { formatForLegacySystem } from '@/lib/scrapers/format-for-ai';
 
-export const maxDuration = 60; // Allow up to 60 seconds
+export const maxDuration = 300; // Allow up to 5 minutes (Whisper/Deepgram transcription takes longer)
 
 export async function POST(request: NextRequest) {
   try {

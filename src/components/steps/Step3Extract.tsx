@@ -41,7 +41,7 @@ export function Step3Extract() {
   // Model selection - use registry to get default and available models
   const modelOptions = getModelOptions('extraction');
   const defaultModel = getDefaultModel('extraction');
-  const [selectedModelId, setSelectedModelId] = useState<string>(defaultModel?.id || 'claude-sonnet-4');
+  const [selectedModelId, setSelectedModelId] = useState<string>(defaultModel?.id || 'claude-sonnet-4.5');
   
   // Check for existing insights when component mounts
   // NOTE: We no longer auto-start - let user select model first

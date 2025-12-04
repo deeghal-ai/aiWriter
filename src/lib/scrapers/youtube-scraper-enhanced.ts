@@ -1,9 +1,23 @@
 // Enhanced YouTube scraper with transcriptions and quality scoring
+// Now with Whisper + Deepgram fallback for Hindi/disabled captions
+// Hindi translation via OpenAI, stores full transcripts (18000 chars)
 
 import { generateSearchQueries, generateComparisonQueries } from './youtube-queries';
 import { getChannelTrustScore, isTrustedChannel } from './youtube-channels';
 import { filterAndRankComments, ScoredComment } from './comment-scorer';
 import { fetchTranscriptWithLibrary, summarizeTranscript } from './youtube-transcript';
+import { EnhancedYouTubeScraper } from './youtube-enhanced';
+import { translateHindiToEnglish, detectHindi } from '@/lib/ai/transcript-processor';
+
+// Config: Store more transcript for UI display (summarization happens in normalizer)
+const TRANSCRIPT_MAX_CHARS = 18000;
+const COMPARISON_TRANSCRIPT_MAX_CHARS = 20000;
+
+// Initialize the enhanced transcriber with Whisper + Deepgram fallback
+const enhancedTranscriber = new EnhancedYouTubeScraper({
+  enableWhisper: true,
+  enableDeepgram: true,
+});
 
 export interface EnhancedYouTubeVideo {
   videoId: string;
@@ -91,16 +105,48 @@ export async function scrapeYouTubeEnhanced(
         // Add content type from query
         videoData.contentType = searchQuery.contentType;
         
-        // Fetch transcript if enabled
+        // Fetch transcript if enabled - with Whisper/Deepgram fallback + Hindi translation
         if (fetchTranscripts) {
+          let rawTranscript: string | null = null;
+          let transcriptSource = 'none';
+          
+          // First try YouTube captions (free)
           const transcript = await fetchTranscriptWithLibrary(result.videoId);
           if (transcript) {
-            videoData.transcript = summarizeTranscript(transcript, 3000); // Increased from 1000 to 3000
+            rawTranscript = transcript.fullText;
+            transcriptSource = 'youtube_captions';
             videoData.transcriptKeyMoments = transcript.keyMoments.map(km => ({
               topic: km.topic,
               text: km.text
             }));
+          } else {
+            // Fallback to Whisper/Deepgram for videos without captions
+            console.log(`[Enhanced] YouTube captions unavailable for ${result.videoId}, trying Whisper/Deepgram...`);
+            const fallbackResult = await enhancedTranscriber.transcribeSingle(result.videoId);
+            if (fallbackResult.transcript && fallbackResult.source !== 'failed') {
+              rawTranscript = fallbackResult.transcript;
+              transcriptSource = fallbackResult.source;
+              videoData.transcriptKeyMoments = [];
+            }
+          }
+          
+          // Process transcript: translate Hindi if needed, store up to 18000 chars
+          if (rawTranscript && rawTranscript.length > 0) {
+            let processedTranscript = rawTranscript;
+            
+            // Translate Hindi to English for better AI understanding
+            if (detectHindi(rawTranscript)) {
+              console.log(`[Enhanced] Detected Hindi in ${result.videoId}, translating...`);
+              processedTranscript = await translateHindiToEnglish(rawTranscript);
+            }
+            
+            // Store full transcript (up to 18000 chars) - summarization happens in normalizer
+            videoData.transcript = processedTranscript.substring(0, TRANSCRIPT_MAX_CHARS);
             videoData.metadata.hasTranscript = true;
+            
+            console.log(`[Enhanced] ✅ ${result.videoId} via ${transcriptSource}: ${rawTranscript.length} chars → stored ${videoData.transcript.length} chars`);
+          } else {
+            console.log(`[Enhanced] ❌ All transcript methods failed for ${result.videoId}`);
           }
         }
         
@@ -173,15 +219,46 @@ export async function scrapeComparisonVideos(
       const videoData = await fetchVideoWithComments(result.videoId, result, apiKey, 35);
       videoData.contentType = 'comparison';
       
-      // Fetch transcript for comparisons (very valuable)
+      // Fetch transcript for comparisons (very valuable) - with Whisper/Deepgram fallback + Hindi translation
+      let rawTranscript: string | null = null;
+      let transcriptSource = 'none';
+      
       const transcript = await fetchTranscriptWithLibrary(result.videoId);
       if (transcript) {
-        videoData.transcript = summarizeTranscript(transcript, 4000);  // Increased from 1500 to 4000 for comparisons
+        rawTranscript = transcript.fullText;
+        transcriptSource = 'youtube_captions';
         videoData.transcriptKeyMoments = transcript.keyMoments.map(km => ({
           topic: km.topic,
           text: km.text
         }));
+      } else {
+        // Fallback to Whisper/Deepgram for comparison videos (high value)
+        console.log(`[Enhanced] Comparison video ${result.videoId} missing captions, trying Whisper/Deepgram...`);
+        const fallbackResult = await enhancedTranscriber.transcribeSingle(result.videoId);
+        if (fallbackResult.transcript && fallbackResult.source !== 'failed') {
+          rawTranscript = fallbackResult.transcript;
+          transcriptSource = fallbackResult.source;
+          videoData.transcriptKeyMoments = [];
+        }
+      }
+      
+      // Process transcript: translate Hindi if needed, store up to 20000 chars for comparisons
+      if (rawTranscript && rawTranscript.length > 0) {
+        let processedTranscript = rawTranscript;
+        
+        // Translate Hindi to English
+        if (detectHindi(rawTranscript)) {
+          console.log(`[Enhanced] Detected Hindi in comparison ${result.videoId}, translating...`);
+          processedTranscript = await translateHindiToEnglish(rawTranscript);
+        }
+        
+        // Store full transcript (up to 20000 chars for comparisons)
+        videoData.transcript = processedTranscript.substring(0, COMPARISON_TRANSCRIPT_MAX_CHARS);
         videoData.metadata.hasTranscript = true;
+        
+        console.log(`[Enhanced] ✅ Comparison ${result.videoId} via ${transcriptSource}: ${rawTranscript.length} → stored ${videoData.transcript.length} chars`);
+      } else {
+        console.log(`[Enhanced] ❌ Comparison video ${result.videoId} failed all transcript methods`);
       }
       
       videos.push(videoData);

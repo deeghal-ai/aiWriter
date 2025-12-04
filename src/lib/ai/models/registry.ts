@@ -39,50 +39,50 @@ export interface ModelDefinition {
  * Add new models here - they'll automatically appear in UI if enabled
  */
 export const MODEL_REGISTRY: ModelDefinition[] = [
-  // ===== ANTHROPIC MODELS =====
+  // ===== ANTHROPIC MODELS (Claude 4.5) =====
   {
-    id: 'claude-haiku-3.5',
+    id: 'claude-haiku-4.5',
     provider: 'anthropic',
-    name: 'Claude Haiku 3.5',
-    modelString: 'claude-3-5-haiku-20241022',
+    name: 'Claude Haiku 4.5',
+    modelString: 'claude-haiku-4-5-20251001',
     capabilities: ['extraction', 'validation'],
     speed: 'fast',
     quality: 'standard',
     costPer1kTokens: { input: 0.001, output: 0.005 },
-    maxTokens: 8192,
+    maxTokens: 64000,
     contextWindow: 200000,
-    description: 'Fast & cheap. Best for quick extraction.',
+    description: 'Fastest model with near-frontier intelligence.',
     isDefault: false,
     enabled: true,
   },
   {
-    id: 'claude-sonnet-4',
+    id: 'claude-sonnet-4.5',
     provider: 'anthropic',
-    name: 'Claude Sonnet 4',
-    modelString: 'claude-sonnet-4-20250514',
+    name: 'Claude Sonnet 4.5',
+    modelString: 'claude-sonnet-4-5-20250929',
     capabilities: ['extraction', 'synthesis', 'generation', 'validation'],
     speed: 'medium',
     quality: 'high',
     costPer1kTokens: { input: 0.003, output: 0.015 },
-    maxTokens: 8192,
+    maxTokens: 64000,
     contextWindow: 200000,
-    description: 'Balanced quality & speed. Best for most tasks.',
+    description: 'Best balance of intelligence, speed & cost. Recommended.',
     recommended: true,
     isDefault: true,
     enabled: true,
   },
   {
-    id: 'claude-opus-4',
+    id: 'claude-opus-4.5',
     provider: 'anthropic',
-    name: 'Claude Opus 4',
-    modelString: 'claude-opus-4-20250514',
+    name: 'Claude Opus 4.5',
+    modelString: 'claude-opus-4-5-20251101',
     capabilities: ['extraction', 'synthesis', 'generation', 'validation'],
     speed: 'slow',
     quality: 'premium',
-    costPer1kTokens: { input: 0.015, output: 0.075 },
-    maxTokens: 16384,
+    costPer1kTokens: { input: 0.005, output: 0.025 },
+    maxTokens: 64000,
     contextWindow: 200000,
-    description: 'Highest quality. Best for complex synthesis.',
+    description: 'Maximum intelligence for complex tasks.',
     enabled: true,
   },
   
@@ -359,7 +359,8 @@ export type TaskType =
   | 'verdicts'             // Step 5: Generate bike recommendations
   | 'article_planning'     // Step 6: Plan article structure
   | 'article_writing'      // Step 6: Write article sections
-  | 'article_coherence';   // Step 6: Check and improve coherence
+  | 'article_coherence'    // Step 6: Check and improve coherence
+  | 'transcript_summarization';  // Summarize long transcripts before extraction
 
 export interface TaskConfig {
   modelId: string;
@@ -374,40 +375,46 @@ export interface TaskConfig {
  */
 const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
   extraction: {
-    modelId: 'claude-haiku-3.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.1,
     maxTokens: 4096,
     description: 'Extract insights from forum discussions'
   },
   personas: {
-    modelId: 'claude-haiku-3.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.3,
     maxTokens: 6144,
     description: 'Generate detailed rider personas'
   },
   verdicts: {
-    modelId: 'claude-haiku-3.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.2,
     maxTokens: 2048,
     description: 'Generate bike recommendations per persona'
   },
   article_planning: {
-    modelId: 'claude-sonnet-4',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.5,
     maxTokens: 4096,
     description: 'Plan article narrative structure'
   },
   article_writing: {
-    modelId: 'claude-haiku-3.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.7,
     maxTokens: 4096,
     description: 'Write creative article sections'
   },
   article_coherence: {
-    modelId: 'claude-haiku-3.5',
+    modelId: 'claude-haiku-4.5',
     temperature: 0.3,
     maxTokens: 2048,
     description: 'Check article coherence and flow'
+  },
+  transcript_summarization: {
+    modelId: 'claude-haiku-4.5',
+    temperature: 0.2,
+    maxTokens: 2048,
+    description: 'Summarize long YouTube transcripts for extraction'
   }
 };
 
@@ -512,7 +519,7 @@ export function getModelApiConfig(task: TaskType): {
   const model = getModelById(config.modelId);
   
   return {
-    model: model?.modelString || 'claude-sonnet-4-20250514',
+    model: model?.modelString || 'claude-sonnet-4-5-20250929',
     maxTokens: config.maxTokens,
     temperature: config.temperature
   };

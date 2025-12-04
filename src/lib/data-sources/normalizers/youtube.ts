@@ -2,6 +2,7 @@
  * YouTube Data Normalizer
  * 
  * Converts YouTube scraper output to the unified NormalizedBikeData format
+ * Summarizes long transcripts with Haiku before passing to AI extraction
  */
 
 import type { 
@@ -11,6 +12,10 @@ import type {
   NormalizedComment 
 } from '../types';
 import { detectTopics, getSourceConfig } from '../config';
+import { summarizeTranscriptWithHaiku } from '@/lib/ai/transcript-processor';
+
+// Config: Max transcript chars for AI context (summarized from 18000)
+const MAX_TRANSCRIPT_FOR_AI = 4000;
 
 export class YouTubeNormalizer implements DataSourceNormalizer {
   sourceId = 'youtube' as const;
@@ -33,6 +38,50 @@ export class YouTubeNormalizer implements DataSourceNormalizer {
     }
     
     return false;
+  }
+  
+  /**
+   * Pre-process videos: summarize long transcripts with Haiku
+   * Call this before normalize() for optimal AI context
+   */
+  async preprocessWithSummarization(rawData: any, bikeName: string): Promise<any> {
+    let videos: any[] = [];
+    
+    if (rawData.videos && Array.isArray(rawData.videos)) {
+      videos = rawData.videos;
+    } else if (Array.isArray(rawData)) {
+      videos = rawData;
+    }
+    
+    console.log(`[YouTubeNormalizer] Pre-processing ${videos.length} videos with Haiku summarization...`);
+    
+    // Process videos in parallel (max 3 concurrent)
+    const concurrency = 3;
+    for (let i = 0; i < videos.length; i += concurrency) {
+      const batch = videos.slice(i, i + concurrency);
+      
+      await Promise.all(batch.map(async (video) => {
+        if (video.transcript && video.transcript.length > MAX_TRANSCRIPT_FOR_AI) {
+          try {
+            // Summarize with Haiku
+            const summarized = await summarizeTranscriptWithHaiku(
+              video.transcript,
+              MAX_TRANSCRIPT_FOR_AI,
+              bikeName
+            );
+            // Store summarized version for AI, keep original for UI
+            video._summarizedTranscript = summarized;
+            console.log(`[YouTubeNormalizer] Summarized ${video.videoId}: ${video.transcript.length} → ${summarized.length} chars`);
+          } catch (error: any) {
+            console.warn(`[YouTubeNormalizer] Summarization failed for ${video.videoId}: ${error.message}`);
+            // Fallback: simple truncation
+            video._summarizedTranscript = video.transcript.substring(0, MAX_TRANSCRIPT_FOR_AI);
+          }
+        }
+      }));
+    }
+    
+    return rawData;
   }
   
   /**
@@ -208,6 +257,7 @@ export class YouTubeNormalizer implements DataSourceNormalizer {
   
   /**
    * Build content from video description and transcript
+   * Long transcripts are summarized with Haiku for efficient AI processing
    */
   private buildContent(video: any): string {
     const parts: string[] = [];
@@ -227,8 +277,15 @@ export class YouTubeNormalizer implements DataSourceNormalizer {
     }
     
     if (video.transcript) {
-      const truncatedTranscript = video.transcript.substring(0, 2000);
-      parts.push(`[Transcript]: ${truncatedTranscript}`);
+      // For AI context, use summarized version (actual summarization happens async)
+      // Here we just truncate - async summarization handled in normalizeVideo
+      const transcriptForAI = video._summarizedTranscript || video.transcript.substring(0, MAX_TRANSCRIPT_FOR_AI);
+      parts.push(`[Transcript]: ${transcriptForAI}`);
+      
+      // Debug log
+      console.log(`[YouTubeNormalizer] Video ${video.videoId || video.title?.substring(0, 30)}: transcript ${video.transcript.length} chars → ${transcriptForAI.length} chars for AI`);
+    } else {
+      console.log(`[YouTubeNormalizer] Video ${video.videoId || video.title?.substring(0, 30)}: NO transcript`);
     }
     
     return parts.join('\n\n');

@@ -37,7 +37,7 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
   
   constructor() {
     super();
-    this.model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+    this.model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
     this.maxTokens = parseInt(process.env.ANTHROPIC_MAX_TOKENS || "4096");
     
     if (this.isConfigured()) {

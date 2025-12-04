@@ -30,12 +30,19 @@ export async function fetchTranscriptWithLibrary(
   try {
     // First try the library
     const libraryResult = await fetchWithLibrary(videoId);
-    if (libraryResult) return libraryResult;
+    if (libraryResult) {
+      console.log(`[Transcript] Library success for ${videoId}: ${libraryResult.fullText.length} chars, ${libraryResult.segments.length} segments`);
+      return libraryResult;
+    }
     
     // Fallback to direct fetch
     const directResult = await fetchTranscriptDirect(videoId);
-    if (directResult) return directResult;
+    if (directResult) {
+      console.log(`[Transcript] Direct fetch success for ${videoId}: ${directResult.fullText.length} chars, ${directResult.segments.length} segments`);
+      return directResult;
+    }
     
+    console.log(`[Transcript] Both methods failed for ${videoId}`);
     return null;
   } catch (error: any) {
     console.error(`[Transcript] ❌ Unexpected error for ${videoId}:`, error?.message || error);
@@ -306,33 +313,35 @@ function extractRelevantSentence(text: string, keywords: string[]): string {
 
 /**
  * Summarize transcript for token efficiency
- * Extract only the most relevant parts
+ * Preserves more content while staying within limits
  */
 export function summarizeTranscript(
   transcript: ProcessedTranscript,
   maxLength: number = 1500
 ): string {
-  // If transcript is short, return as-is
+  console.log(`[summarizeTranscript] Input: ${transcript.fullText.length} chars, maxLength: ${maxLength}`);
+  
+  // If transcript is short enough, return as-is
   if (transcript.fullText.length <= maxLength) {
+    console.log(`[summarizeTranscript] Returning full text (under limit)`);
     return transcript.fullText;
   }
   
-  // Build summary from key moments
-  let summary = '';
+  // For longer transcripts, prioritize the actual content over key moments
+  // Take most of the beginning (reviews usually front-load key info)
+  const beginningPortion = 0.7; // 70% from beginning
+  const endPortion = 0.3; // 30% from end
   
-  // Add key moments
-  transcript.keyMoments.forEach(km => {
-    summary += `[${km.topic}]: ${km.text}\n`;
-  });
+  const beginningLength = Math.floor(maxLength * beginningPortion);
+  const endLength = Math.floor(maxLength * endPortion) - 10; // -10 for separator
   
-  // If still have room, add beginning and end
-  const remaining = maxLength - summary.length;
-  if (remaining > 200) {
-    const intro = transcript.fullText.substring(0, remaining / 2);
-    const outro = transcript.fullText.substring(transcript.fullText.length - remaining / 2);
-    summary = intro + '\n...\n' + summary + '\n...\n' + outro;
-  }
+  const beginning = transcript.fullText.substring(0, beginningLength);
+  const ending = transcript.fullText.substring(transcript.fullText.length - endLength);
   
-  return summary.substring(0, maxLength);
+  const result = `${beginning}\n\n[...]\n\n${ending}`;
+  
+  console.log(`[summarizeTranscript] Output: ${result.length} chars (${beginningLength} from start, ${endLength} from end)`);
+  
+  return result.substring(0, maxLength);
 }
 

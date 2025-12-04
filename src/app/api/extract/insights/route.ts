@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
     if (body.xbhpData) availableSources.push('xBhp');
     console.log(`[Extract] Available sources: ${availableSources.join(', ')}`);
     
-    // Process and merge all data sources
-    const mergeResult = processAndMergeScrapedData(
+    // Process and merge all data sources (now async for Haiku transcript summarization)
+    const mergeResult = await processAndMergeScrapedData(
       {
         youtube: body.youtubeData,
         reddit: body.redditData,
