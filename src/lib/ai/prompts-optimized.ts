@@ -19,6 +19,7 @@ export function buildSingleBikeExtractionPrompt(
 - source: use "YouTube" or "Reddit" - attribute correctly based on where comment came from
 - categories: be specific ("Highway stability at 100kmph" not "Stability")
 - surprising: must contradict common assumptions, needs 2+ data points
+- TRANSLATE: If ANY text is in Hindi/Hinglish, translate to English. ALL output must be in English.
 </rules>
 
 <schema>
@@ -63,7 +64,7 @@ Return valid JSON only. No explanations, no markdown fences.`;
 /**
  * System prompt for extraction
  */
-export const EXTRACTION_SYSTEM_PROMPT = "You are a data extraction expert. Output only valid JSON matching the provided schema. No preamble, no explanations.";
+export const EXTRACTION_SYSTEM_PROMPT = "You are a data extraction expert. Output only valid JSON matching the provided schema. No preamble, no explanations. IMPORTANT: If any source text is in Hindi/Hinglish, translate it to English in your output. All quotes and insights must be in English.";
 
 /**
  * Condense insights for persona generation (reduce token count)
@@ -217,7 +218,7 @@ Generate personas JSON:`;
 /**
  * System prompt for persona generation
  */
-export const PERSONA_SYSTEM_PROMPT = 'You are an expert in Indian motorcycle buyer psychology. Generate specific, evidence-backed personas. Output only valid JSON.';
+export const PERSONA_SYSTEM_PROMPT = 'You are an expert in Indian motorcycle buyer psychology. Generate specific, evidence-backed personas. Output only valid JSON. All output must be in English - translate any Hindi/Hinglish content.';
 
 /**
  * Condense personas for verdict generation
@@ -379,7 +380,7 @@ Generate verdicts for all ${personas.length} personas:`;
 /**
  * System prompt for verdict generation
  */
-export const VERDICT_SYSTEM_PROMPT = 'You are an expert motorcycle advisor. Make definitive recommendations with evidence. No fence-sitting. Output only valid JSON.';
+export const VERDICT_SYSTEM_PROMPT = 'You are an expert motorcycle advisor. Make definitive recommendations with evidence. No fence-sitting. Output only valid JSON. All output must be in English - translate any Hindi/Hinglish content.';
 
 /**
  * Filter insights relevant to a specific persona's priorities

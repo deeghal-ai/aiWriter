@@ -1,13 +1,13 @@
 // Enhanced YouTube scraper with transcriptions and quality scoring
 // Now with Whisper + Deepgram fallback for Hindi/disabled captions
-// Hindi translation via OpenAI, stores full transcripts (18000 chars)
+// Hindi translation via OpenAI for transcripts, comments, and descriptions
 
 import { generateSearchQueries, generateComparisonQueries } from './youtube-queries';
 import { getChannelTrustScore, isTrustedChannel } from './youtube-channels';
 import { filterAndRankComments, ScoredComment } from './comment-scorer';
 import { fetchTranscriptWithLibrary, summarizeTranscript } from './youtube-transcript';
 import { EnhancedYouTubeScraper } from './youtube-enhanced';
-import { translateHindiToEnglish, detectHindi } from '@/lib/ai/transcript-processor';
+import { translateHindiToEnglish, translateHindiBatch, detectHindi } from '@/lib/ai/transcript-processor';
 
 // Config: Store more transcript for UI display (summarization happens in normalizer)
 const TRANSCRIPT_MAX_CHARS = 18000;
@@ -308,6 +308,7 @@ async function searchYouTube(
 
 /**
  * Fetch video details and quality-scored comments
+ * Now translates Hindi content in descriptions and comments
  */
 async function fetchVideoWithComments(
   videoId: string,
@@ -327,9 +328,15 @@ async function fetchVideoWithComments(
   const viewCount = parseInt(videoData?.statistics?.viewCount || '0');
   
   // Use full description from video details API (not truncated search snippet)
-  const fullDescription = videoData?.snippet?.description || basicInfo.description;
+  let fullDescription = videoData?.snippet?.description || basicInfo.description;
   const fullTitle = videoData?.snippet?.title || basicInfo.title;
   const fullChannelTitle = videoData?.snippet?.channelTitle || basicInfo.channelTitle;
+  
+  // Translate description if it contains Hindi
+  if (detectHindi(fullDescription)) {
+    console.log(`[Enhanced] Translating Hindi description for ${videoId}...`);
+    fullDescription = await translateHindiToEnglish(fullDescription);
+  }
   
   // Fetch comments
   const commentsUrl = new URL('https://www.googleapis.com/youtube/v3/commentThreads');
@@ -356,7 +363,20 @@ async function fetchVideoWithComments(
     console.warn(`Failed to fetch comments for ${videoId}`);
   }
   
-  // Quality filter comments
+  // Translate Hindi comments in batch (more efficient)
+  const commentTexts = rawComments.map(c => c.text);
+  const hasAnyHindi = commentTexts.some(t => detectHindi(t));
+  
+  if (hasAnyHindi) {
+    console.log(`[Enhanced] Translating Hindi comments for ${videoId}...`);
+    const translatedTexts = await translateHindiBatch(commentTexts);
+    rawComments = rawComments.map((c, i) => ({
+      ...c,
+      text: translatedTexts[i]
+    }));
+  }
+  
+  // Quality filter comments (after translation for better scoring)
   const qualityComments = filterAndRankComments(rawComments, {
     minScore: minCommentScore,
     maxComments: 15,
@@ -370,7 +390,7 @@ async function fetchVideoWithComments(
   return {
     videoId,
     title: fullTitle,
-    description: fullDescription, // FULL description from videos API, NOT truncated!
+    description: fullDescription,
     channelTitle: fullChannelTitle,
     publishedAt: basicInfo.publishedAt,
     viewCount,

@@ -8,27 +8,44 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getTaskConfig, getModelDefinitionForTask } from './models/registry';
 
-// Hindi/Devanagari detection regex
-const HINDI_REGEX = /[\u0900-\u097F]/;
-const HINDI_THRESHOLD = 0.15; // If >15% of chars are Hindi, consider it Hindi
+// Hindi/Devanagari detection regex (covers Devanagari script used for Hindi)
+const HINDI_REGEX = /[\u0900-\u097F]/g;
+const HINDI_THRESHOLD = 0.03; // If >3% of chars are Hindi, consider it Hindi (lowered from 15%)
+const MIN_HINDI_CHARS = 3; // Minimum Hindi characters to trigger (for short texts)
 
 /**
- * Detect if text contains significant Hindi content
+ * Detect if text contains any significant Hindi content
+ * Lowered threshold to catch Hinglish and mixed content
  */
 export function detectHindi(text: string): boolean {
-  if (!text || text.length < 50) return false;
+  if (!text || text.length < 10) return false;
   
-  const hindiChars = (text.match(HINDI_REGEX) || []).length;
+  const hindiMatches = text.match(HINDI_REGEX) || [];
+  const hindiChars = hindiMatches.length;
+  
+  // For short texts, just check if there are any Hindi chars
+  if (text.length < 100) {
+    return hindiChars >= MIN_HINDI_CHARS;
+  }
+  
+  // For longer texts, use percentage threshold
   const ratio = hindiChars / text.length;
-  
-  return ratio > HINDI_THRESHOLD;
+  return ratio > HINDI_THRESHOLD || hindiChars >= 10;
+}
+
+/**
+ * Check if text contains ANY Hindi characters (for strict detection)
+ */
+export function containsHindi(text: string): boolean {
+  if (!text) return false;
+  return HINDI_REGEX.test(text);
 }
 
 /**
  * Translate Hindi text to English using OpenAI
  * Uses the existing OPENAI_API_KEY from environment
  */
-export async function translateHindiToEnglish(text: string): Promise<string> {
+export async function translateHindiToEnglish(text: string, forceTranslate: boolean = false): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   
   if (!apiKey) {
@@ -36,8 +53,8 @@ export async function translateHindiToEnglish(text: string): Promise<string> {
     return text;
   }
   
-  // Only translate if there's significant Hindi content
-  if (!detectHindi(text)) {
+  // Only translate if there's Hindi content (or force translate)
+  if (!forceTranslate && !detectHindi(text)) {
     return text;
   }
   
@@ -55,7 +72,7 @@ export async function translateHindiToEnglish(text: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a translator. Translate the following Hindi/Hinglish motorcycle review transcript to clear English. Preserve all technical details, opinions, and specific numbers. Keep the conversational tone.'
+            content: 'You are a translator. Translate the following Hindi/Hinglish motorcycle review content to clear English. Preserve all technical details, opinions, specific numbers, and the original tone. If the text is already in English, return it unchanged.'
           },
           {
             role: 'user',
@@ -89,6 +106,83 @@ export async function translateHindiToEnglish(text: string): Promise<string> {
 }
 
 /**
+ * Translate multiple texts in a single API call (for comments)
+ * More efficient than translating one by one
+ */
+export async function translateHindiBatch(texts: string[]): Promise<string[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    console.warn('[TranscriptProcessor] No OpenAI API key, skipping batch translation');
+    return texts;
+  }
+  
+  // Filter texts that need translation
+  const needsTranslation = texts.map((text, idx) => ({ text, idx, hasHindi: detectHindi(text) }));
+  const toTranslate = needsTranslation.filter(t => t.hasHindi);
+  
+  if (toTranslate.length === 0) {
+    return texts;
+  }
+  
+  console.log(`[TranscriptProcessor] Batch translating ${toTranslate.length}/${texts.length} texts with Hindi...`);
+  
+  try {
+    // Create numbered format for batch translation
+    const batchInput = toTranslate.map((t, i) => `[${i + 1}] ${t.text}`).join('\n\n');
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a translator. Translate the following numbered Hindi/Hinglish motorcycle comments to English. Keep the same numbering format [1], [2], etc. Preserve technical details, opinions, and tone. If a comment is already in English, keep it unchanged.`
+          },
+          {
+            role: 'user',
+            content: batchInput
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[TranscriptProcessor] Batch translation API error');
+      return texts;
+    }
+
+    const result = await response.json();
+    const translated = result.choices?.[0]?.message?.content?.trim() || '';
+    
+    // Parse translated results back
+    const translatedParts = translated.split(/\[\d+\]/).filter(Boolean).map(s => s.trim());
+    
+    // Map back to original array
+    const output = [...texts];
+    toTranslate.forEach((t, i) => {
+      if (translatedParts[i]) {
+        output[t.idx] = translatedParts[i];
+      }
+    });
+    
+    console.log(`[TranscriptProcessor] ✅ Batch translated ${toTranslate.length} texts`);
+    return output;
+    
+  } catch (error: any) {
+    console.error('[TranscriptProcessor] Batch translation failed:', error.message);
+    return texts;
+  }
+}
+
+/**
  * Summarize a long transcript using Haiku
  * Uses the Anthropic SDK directly for efficiency
  */
@@ -118,16 +212,20 @@ export async function summarizeTranscriptWithHaiku(
     // Initialize Anthropic client
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     
-    // Build the summarization prompt
+    // Build the summarization prompt (also handles any remaining Hindi)
     const bikeContext = bikeName ? ` about the ${bikeName}` : '';
-    const prompt = `Summarize this motorcycle review transcript${bikeContext}. Focus on:
+    const prompt = `Summarize this motorcycle review transcript${bikeContext}. 
+
+IMPORTANT: If there is ANY Hindi/Hinglish text, translate it to English in your summary.
+
+Focus on:
 - Specific technical observations (engine, handling, braking, suspension)
 - Real-world experiences and problems mentioned
 - Comparisons to other bikes
 - Specific numbers (mileage, price, service costs, km driven)
 - Strong opinions (what they loved/hated)
 
-Keep the reviewer's voice and specific details. Output should be ~${Math.floor(maxOutputLength * 0.8)} characters.
+Keep the reviewer's voice and specific details. Output MUST be in English only. Output should be ~${Math.floor(maxOutputLength * 0.8)} characters.
 
 TRANSCRIPT:
 ${transcript}`;
