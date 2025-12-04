@@ -9,33 +9,7 @@ Let me create a complete integration for the internal BikeDekho API. I'll implem
 3. **Step 1 update** - Add checkbox for internal data
 4. **Step 2 update** - Add fetch button and display for internal data
 
-[2 tools called]
 
-Now let me update Step 1 to add the checkbox for internal data:
-
-[5 tools called]
-
-Now let me update Step 2 to add internal data fetching. First, let me read the complete file:
-
-[1 tool called]
-
-Now let me update Step 2 with internal data support. I'll make several targeted changes:
-
-[6 tools called]
-
-Now let me update the store's loadComparison to include internal in researchSources:
-
-[2 tools called]
-
-Now let me update the ScrapedDataView component to handle internal data display:
-
-[4 tools called]
-
-Now let me add handling for internal review content in the expanded view:
-
-[5 tools called]
-
-I've implemented the complete internal data integration. Here's a summary of everything that was added:
 
 ---
 

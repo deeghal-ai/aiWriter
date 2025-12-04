@@ -82,7 +82,7 @@ src/lib/ai/prompts-optimized.ts → EXTRACTION_SYSTEM_PROMPT
 POST /api/extract/insights
   ├─ validates input
   ├─ combines data sources
-  └─ calls extractInsightsOptimized(bike1Name, bike2Name, combinedData)
+  └─ calls extractInsightsOptimized(bike1Name, bike2Name, combinedData) //prsent in factory.ts
 
 // 2. Factory delegates to provider
 extractInsightsOptimized() in factory.ts
