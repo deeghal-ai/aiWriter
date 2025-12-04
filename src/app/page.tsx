@@ -272,19 +272,25 @@ export default function HomePage() {
                   
                   {/* Step progress pills */}
                   <div className="flex gap-1 mb-3">
-                    {STEP_NAMES.map((name, idx) => (
-                      <div 
-                        key={idx}
-                        className={`flex-1 h-1.5 rounded-full transition-colors ${
-                          comparison.completed_steps?.includes(idx + 1) 
-                            ? 'bg-green-500' 
-                            : (comparison.current_step || 1) === idx + 1
-                            ? 'bg-blue-500'
-                            : 'bg-gray-200'
-                        }`}
-                        title={`${name}${comparison.completed_steps?.includes(idx + 1) ? ' ✓' : ''}`}
-                      />
-                    ))}
+                    {STEP_NAMES.map((name, idx) => {
+                      const stepNum = idx + 1;
+                      const isCurrentStep = (comparison.current_step || 1) === stepNum;
+                      const isCompleted = comparison.completed_steps?.includes(stepNum);
+                      
+                      return (
+                        <div 
+                          key={idx}
+                          className={`flex-1 h-1.5 rounded-full transition-colors ${
+                            isCurrentStep
+                              ? 'bg-blue-500'  // Current step always shows blue
+                              : isCompleted
+                              ? 'bg-green-500' // Completed steps show green
+                              : 'bg-gray-200'  // Future steps show gray
+                          }`}
+                          title={`${name}${isCompleted ? ' ✓' : ''}${isCurrentStep ? ' (current)' : ''}`}
+                        />
+                      );
+                    })}
                   </div>
                   
                   {/* Action buttons */}
