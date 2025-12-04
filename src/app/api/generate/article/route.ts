@@ -28,16 +28,16 @@ export const maxDuration = 300; // 5 minutes for article generation
 const getArticleWritingConfig = () => getModelApiConfig('article_writing');
 
 // Helper to call Claude with streaming (required for Claude 4.5 models)
+// Includes retry logic for transient errors like "overloaded"
 async function callClaudeWithStreaming(
   client: Anthropic,
   model: string,
   maxTokens: number,
   temperature: number,
   messages: Anthropic.MessageParam[],
-  system?: string
+  system?: string,
+  maxRetries: number = 3
 ): Promise<string> {
-  let fullText = '';
-  
   const streamParams: Anthropic.MessageStreamParams = {
     model,
     max_tokens: maxTokens,
@@ -49,15 +49,44 @@ async function callClaudeWithStreaming(
     streamParams.system = system;
   }
   
-  const stream = client.messages.stream(streamParams);
+  let lastError: Error | null = null;
   
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      fullText += event.delta.text;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      let fullText = '';
+      const stream = client.messages.stream(streamParams);
+      
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          fullText += event.delta.text;
+        }
+      }
+      
+      return fullText;
+    } catch (error: any) {
+      lastError = error;
+      const errorStr = String(error);
+      
+      // Retry on transient errors (overloaded, rate limit, server errors)
+      const isRetryable = 
+        errorStr.includes('overloaded') || 
+        errorStr.includes('rate_limit') ||
+        errorStr.includes('529') ||
+        errorStr.includes('500') ||
+        errorStr.includes('503');
+      
+      if (isRetryable && attempt < maxRetries) {
+        const delay = Math.min(2000 * Math.pow(2, attempt - 1), 30000); // Exponential backoff, max 30s
+        console.log(`[Article] Retrying after ${delay}ms (attempt ${attempt}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      throw error;
     }
   }
   
-  return fullText;
+  throw lastError || new Error('Failed after retries');
 }
 
 interface ArticleGenerationRequest {

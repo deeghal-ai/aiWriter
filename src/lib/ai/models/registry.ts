@@ -381,25 +381,25 @@ const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
     description: 'Extract insights from forum discussions'
   },
   personas: {
-    modelId: 'claude-sonnet-4.5',
+    modelId: 'claude-opus-4.5',
     temperature: 0.3,
     maxTokens: 6144,
     description: 'Generate detailed rider personas'
   },
   verdicts: {
-    modelId: 'claude-sonnet-4.5',
+    modelId: 'claude-opus-4.5',
     temperature: 0.2,
     maxTokens: 2048,
     description: 'Generate bike recommendations per persona'
   },
   article_planning: {
-    modelId: 'claude-sonnet-4.5',
+    modelId: 'claude-opus-4.5',
     temperature: 0.5,
     maxTokens: 4096,
     description: 'Plan article narrative structure'
   },
   article_writing: {
-    modelId: 'claude-sonnet-4.5',
+    modelId: 'claude-opus-4.5',
     temperature: 0.7,
     maxTokens: 4096,
     description: 'Write creative article sections'

@@ -29,7 +29,7 @@ export function buildCondensedContext(
     insights: condensedInsights(insights),
     personas: condensedPersonas(personas),
     verdicts: condensedVerdicts(verdicts),
-    keyQuotes: extractKeyQuotes(insights, 25), // Increased to capture more "voice"
+    keyQuotes: extractKeyQuotes(insights, 20), // Max 20 best quotes
     tensionPoints: identifyTensionPoints(insights, verdicts),
     hookData: extractHookData(insights, personas, verdicts),
   };
@@ -103,7 +103,6 @@ interface HookData {
   hasDistinctScenarios: boolean; // Can use Specific Scenario?
   mostCompellingInsight: string;
   mostDividedTopic: string;
-  sensoryDetails: string[]; // Added to capture "heat", "vibration", "noise"
 }
 
 function condensedInsights(insights: InsightExtractionResult): CondensedInsights {
@@ -123,7 +122,7 @@ function condensedInsights(insights: InsightExtractionResult): CondensedInsights
         .sort((a, b) => b.frequency - a.frequency)
         .slice(0, 4)
         .map(c => `${c.category} (${c.frequency}x)`),
-      surprising: filterUsefulSurprisingInsights(insights.bike1?.surprising_insights || []),
+      surprising: insights.bike1?.surprising_insights || [],
     },
     bike2: {
       name: insights.bike2?.name || 'Bike 2',
@@ -135,76 +134,10 @@ function condensedInsights(insights: InsightExtractionResult): CondensedInsights
         .sort((a, b) => b.frequency - a.frequency)
         .slice(0, 4)
         .map(c => `${c.category} (${c.frequency}x)`),
-      surprising: filterUsefulSurprisingInsights(insights.bike2?.surprising_insights || []),
+      surprising: insights.bike2?.surprising_insights || [],
     },
     totalQuotes: insights.metadata?.total_quotes || 0,
   };
-}
-
-/**
- * Filter surprising insights to prioritize actionable, contrarian findings
- * - Prioritize insights that contradict marketing/specs
- * - Prioritize insights with specific data points (numbers, percentages)
- * - Deprioritize generic/vague statements
- * - Limit to 3-4 most useful insights
- */
-function filterUsefulSurprisingInsights(insights: string[], maxCount: number = 4): string[] {
-  if (!insights || insights.length === 0) return [];
-  
-  // Score each insight for usefulness
-  const scoredInsights = insights.map(insight => {
-    let score = 0;
-    const lowerInsight = insight.toLowerCase();
-    
-    // +3: Contains specific numbers/percentages (more actionable)
-    if (/\d+%|\d+\s*(kmpl|km\/l|bhp|nm|kg|km|rupees|₹|lakh|rs)/i.test(insight)) {
-      score += 3;
-    }
-    
-    // +2: Contrarian language (contradicts expectations)
-    const contrarianPhrases = ['despite', 'contrary to', 'unexpectedly', 'surprisingly', 
-      'however', 'but actually', 'not as', 'better than expected', 'worse than'];
-    if (contrarianPhrases.some(phrase => lowerInsight.includes(phrase))) {
-      score += 2;
-    }
-    
-    // +2: Mentions specific comparison or trade-off
-    if (/vs|versus|compared to|than the|over the/i.test(insight)) {
-      score += 2;
-    }
-    
-    // +1: Mentions real-world scenarios
-    const scenarioPhrases = ['traffic', 'highway', 'commute', 'pillion', 'monsoon', 
-      'service', 'mileage', 'city', 'long ride', 'daily'];
-    if (scenarioPhrases.some(phrase => lowerInsight.includes(phrase))) {
-      score += 1;
-    }
-    
-    // -2: Too generic/vague
-    const genericPhrases = ['good bike', 'nice bike', 'great motorcycle', 'overall good',
-      'recommended', 'value for money', 'bang for buck'];
-    if (genericPhrases.some(phrase => lowerInsight.includes(phrase))) {
-      score -= 2;
-    }
-    
-    // -1: Too short (likely not detailed enough)
-    if (insight.length < 40) {
-      score -= 1;
-    }
-    
-    // +1: Longer, more detailed insights
-    if (insight.length > 80) {
-      score += 1;
-    }
-    
-    return { insight, score };
-  });
-  
-  // Sort by score (descending) and take top N
-  return scoredInsights
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxCount)
-    .map(s => s.insight);
 }
 
 function condensedPersonas(personas: PersonaGenerationResult): CondensedPersona[] {
@@ -254,8 +187,8 @@ function extractKeyQuotes(insights: InsightExtractionResult, maxQuotes: number):
       }
     }
 
-    // Get complaints - prioritized for "Cynical Columnist" tone
-    for (const complaint of (bike.complaints || []).slice(0, 3)) { // Increased complaint sampling
+    // Get complaints
+    for (const complaint of (bike.complaints || []).slice(0, 2)) {
       for (const quote of (complaint.quotes || []).slice(0, 2)) {
         quotes.push({
           text: quote.text.slice(0, 150),
@@ -287,15 +220,6 @@ function identifyTensionPoints(
   const bike2Strengths = new Set((insights.bike2?.praises || []).map(p => p.category.toLowerCase()));
   const bike1Weaknesses = new Set((insights.bike1?.complaints || []).map(c => c.category.toLowerCase()));
 
-  // Emotional dimensions mapping
-  const emotionalMap: Record<string, string> = {
-    'engine': 'Soul vs Efficiency',
-    'comfort': 'Spine vs Style',
-    'service': 'Peace of Mind vs Passion',
-    'value': 'Wallet vs Heart',
-    'handling': 'Agility vs Stability'
-  };
-
   // Common dimensions to check
   const dimensions = ['engine', 'comfort', 'service', 'value', 'handling', 'reliability', 'fuel', 'build'];
 
@@ -306,12 +230,10 @@ function identifyTensionPoints(
     const bike2HasWeakness = [...bike2Weaknesses].some(w => w.includes(dim));
 
     if ((bike1HasStrength && bike2HasWeakness) || (bike2HasStrength && bike1HasWeakness)) {
-      const displayDim = emotionalMap[dim] || (dim.charAt(0).toUpperCase() + dim.slice(1));
-      
       points.push({
-        dimension: displayDim,
-        bike1Wins: bike1HasStrength ? `dominates ${dim}` : `struggles with ${dim}`,
-        bike2Wins: bike2HasStrength ? `dominates ${dim}` : `struggles with ${dim}`,
+        dimension: dim.charAt(0).toUpperCase() + dim.slice(1),
+        bike1Wins: bike1HasStrength ? `Strong ${dim}` : `Weak ${dim}`,
+        bike2Wins: bike2HasStrength ? `Strong ${dim}` : `Weak ${dim}`,
       });
     }
   }
@@ -332,14 +254,6 @@ function extractHookData(
   const hasPriceDiscussion = (insights.bike1?.praises || []).concat(insights.bike1?.complaints || [])
     .concat(insights.bike2?.praises || []).concat(insights.bike2?.complaints || [])
     .some(i => i.category.toLowerCase().includes('price') || i.category.toLowerCase().includes('value'));
-    
-  // Check for sensory details
-  const allQuotesText = (insights.bike1?.praises || []).concat(insights.bike1?.complaints || [])
-    .concat(insights.bike2?.praises || []).concat(insights.bike2?.complaints || [])
-    .flatMap(c => c.quotes.map(q => q.text.toLowerCase())).join(' ');
-    
-  const sensoryKeywords = ['vibrat', 'heat', 'sound', 'noise', 'thump', 'plastic', 'rattle', 'smooth', 'jerk'];
-  const foundSensory = sensoryKeywords.filter(k => allQuotesText.includes(k));
 
   // Find most compelling surprising insight
   const allSurprising = [
@@ -362,7 +276,6 @@ function extractHookData(
     hasDistinctScenarios: (personas?.personas || []).length >= 3,
     mostCompellingInsight: allSurprising[0] || 'Both bikes serve different rider needs',
     mostDividedTopic: closestVerdict?.personaName || 'General comparison',
-    sensoryDetails: foundSensory,
   };
 }
 
@@ -394,11 +307,7 @@ ${ctx.verdicts.map(v => `• ${v.personaName} → ${v.winner} (${v.confidence}%)
 
 <tension_points>
 ${ctx.tensionPoints.map(t => `• ${t.dimension}: ${ctx.bikes.bike1} ${t.bike1Wins}, ${ctx.bikes.bike2} ${t.bike2Wins}`).join('\n')}
-</tension_points>
-
-<sensory_cues>
-${ctx.hookData.sensoryDetails.slice(0, 5).join(', ')}
-</sensory_cues>`;
+</tension_points>`;
 }
 
 /**
@@ -459,12 +368,12 @@ export function determineOptimalHookStrategy(ctx: CondensedArticleContext): {
   if (hookData.priceGap) {
     candidates.push({
       strategy: 'Price Paradox',
-      score: 70, 
+      score: 70, // Reduced from always-first priority
       reason: 'Price/value is a major discussion point',
       elements: {
-        scenario: `The ${ctx.bikes.bike1} vs ${ctx.bikes.bike2} price gap is a lie`,
-        tension: 'The "cheaper" bike hides its costs in the service center bill',
-        promise: 'We calculated the real price of ownership (including your sanity)',
+        scenario: `The ${ctx.bikes.bike1} vs ${ctx.bikes.bike2} price gap isn't what it seems`,
+        tension: 'The cheaper bike might cost you more in the long run',
+        promise: 'We crunched the real ownership costs',
       },
     });
   }
@@ -473,12 +382,12 @@ export function determineOptimalHookStrategy(ctx: CondensedArticleContext): {
   if (hookData.personasSplit) {
     candidates.push({
       strategy: 'WhatsApp Debate',
-      score: 85, 
+      score: 85, // High score - conflict is engaging
       reason: 'Personas are split between bikes - perfect for debate framing',
       elements: {
-        scenario: `Your riding group chat is at war over ${ctx.bikes.bike1} vs ${ctx.bikes.bike2}`,
-        tension: `${ctx.verdicts.map(v => `${v.personaName} defends the ${v.winner}`).join(', ')}`,
-        promise: 'We settle the argument. Someone will be upset.',
+        scenario: `Your friends are arguing about ${ctx.bikes.bike1} vs ${ctx.bikes.bike2}`,
+        tension: `${ctx.verdicts.map(v => `${v.personaName} swears by ${v.winner}`).join(', ')}`,
+        promise: 'We found out who\'s actually right—and for whom',
       },
     });
   }
@@ -487,12 +396,12 @@ export function determineOptimalHookStrategy(ctx: CondensedArticleContext): {
   if (hookData.hasSurprisingContrarian && hookData.mostCompellingInsight) {
     candidates.push({
       strategy: 'Unexpected Truth',
-      score: 90, 
+      score: 90, // Highest base score - contrarian hooks perform well
       reason: 'Strong contrarian insight that challenges assumptions',
       elements: {
         scenario: hookData.mostCompellingInsight,
-        tension: 'The brochures lied. The YouTubers missed it.',
-        promise: 'Here is the uncomfortable truth about these machines.',
+        tension: 'Everything you\'ve read about this comparison misses the point',
+        promise: 'Here\'s what nobody tells you',
       },
     });
   }
@@ -500,15 +409,14 @@ export function determineOptimalHookStrategy(ctx: CondensedArticleContext): {
   // Specific Scenario - immersive when we have clear use cases
   if (hookData.hasDistinctScenarios && ctx.personas.length >= 3) {
     const mainPersona = ctx.personas[0];
-    const sensory = hookData.sensoryDetails[0] ? `feeling the ${hookData.sensoryDetails[0]}` : 'sweating in traffic';
     candidates.push({
       strategy: 'Specific Scenario',
-      score: 75,
+      score: 75, // Good score - specific scenarios are engaging
       reason: 'Distinct personas with clear use cases',
       elements: {
-        scenario: `Monday morning. ${mainPersona.name} is ${sensory}.`,
-        tension: `This is where the spec sheet dies and reality kicks in.`,
-        promise: 'We rode them where it hurts. Here is the verdict.',
+        scenario: `It's Monday morning. ${mainPersona.name} is stuck in traffic, questioning life choices.`,
+        tension: `${mainPersona.usage} - and the bike has to survive it`,
+        promise: 'We lived with both bikes for a month. Here\'s the truth.',
       },
     });
   }
@@ -520,9 +428,9 @@ export function determineOptimalHookStrategy(ctx: CondensedArticleContext): {
       score: 50,
       reason: 'Default to contrarian angle',
       elements: {
-        scenario: `${ctx.bikes.bike1} vs ${ctx.bikes.bike2} - the forgotten battle`,
-        tension: 'Why are we even comparing these two? Because you asked.',
-        promise: 'The answer is simpler than you think.',
+        scenario: `${ctx.bikes.bike1} vs ${ctx.bikes.bike2} comparison`,
+        tension: 'The spec sheets don\'t tell you this',
+        promise: 'Real owner experiences reveal the truth',
       },
     });
   }
@@ -543,3 +451,4 @@ export function determineOptimalHookStrategy(ctx: CondensedArticleContext): {
     elements: winner.elements,
   };
 }
+

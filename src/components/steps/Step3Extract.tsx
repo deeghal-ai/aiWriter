@@ -15,7 +15,11 @@ import {
   AlertCircle,
   Zap,
   Crown,
-  Star
+  Star,
+  Code,
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { getModelOptions, getDefaultModel, type ModelOption } from '@/lib/ai/models/registry';
@@ -37,6 +41,8 @@ export function Step3Extract() {
   const [error, setError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [showFullJson, setShowFullJson] = useState(false);
+  const [jsonCopied, setJsonCopied] = useState(false);
   
   // Model selection - use registry to get default and available models
   const modelOptions = getModelOptions('extraction');
@@ -157,6 +163,17 @@ export function Step3Extract() {
     if (extractedInsights) {
       markStepComplete(3);
       setCurrentStep(4);
+    }
+  };
+  
+  const handleCopyJson = async () => {
+    if (!extractedInsights) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(extractedInsights, null, 2));
+      setJsonCopied(true);
+      setTimeout(() => setJsonCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
   
@@ -321,9 +338,20 @@ export function Step3Extract() {
                 </div>
               </div>
               
-              <p className="text-xs text-slate-500 mt-3">
-                Processed in {(extractedInsights.metadata.processing_time_ms / 1000).toFixed(1)}s
-              </p>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-slate-500">
+                  Processed in {(extractedInsights.metadata.processing_time_ms / 1000).toFixed(1)}s
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFullJson(true)}
+                  className="text-xs gap-1.5 text-slate-600 hover:text-slate-900"
+                >
+                  <Code className="h-3.5 w-3.5" />
+                  View Full JSON
+                </Button>
+              </div>
             </CardContent>
           </Card>
           
@@ -482,6 +510,72 @@ export function Step3Extract() {
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
+      
+      {/* Full JSON Modal */}
+      {showFullJson && extractedInsights && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="font-semibold text-lg">Full Insights JSON</h3>
+                <p className="text-sm text-slate-500">
+                  Complete extracted data structure
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyJson}
+                  className="gap-1.5"
+                >
+                  {jsonCopied ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-600" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy JSON
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFullJson(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-4">
+              <pre className="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg overflow-auto font-mono">
+                {JSON.stringify(extractedInsights, null, 2)}
+              </pre>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="p-4 border-t bg-slate-50 rounded-b-lg">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>
+                  {extractedInsights.bike1.praises.length + extractedInsights.bike2.praises.length} praise categories • 
+                  {extractedInsights.bike1.complaints.length + extractedInsights.bike2.complaints.length} complaint categories • 
+                  {extractedInsights.metadata.total_quotes} total quotes
+                </span>
+                <span>
+                  {(JSON.stringify(extractedInsights).length / 1024).toFixed(1)} KB
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

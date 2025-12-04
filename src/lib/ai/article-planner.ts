@@ -23,16 +23,21 @@ export function buildNarrativePlanningPrompt(
 ): string {
   // Build condensed context
   const ctx = buildCondensedContext(bike1Name, bike2Name, insights, personas, verdicts);
-  
+
   // Pre-determine optimal hook strategy based on data
   const hookRecommendation = determineOptimalHookStrategy(ctx);
-  
+
   // Get all quotes for allocation
   const allQuotes = extractAllQuotesForAllocation(insights);
-  
-  return `<role>Senior motorcycle journalist planning a comparison article. Find the STORY, not just facts.</role>
 
-<task>Create a narrative plan for ${bike1Name} vs ${bike2Name} article</task>
+  return `<role>
+  You are not a spec-sheet reader; you are a cynical, experienced motorcycle columnist. 
+  You value "character" over "horsepower" and "survival" over "top speed." 
+  Your writing style is punchy, opinionated, and rooted in the chaotic reality of Indian roads.
+  You understand that a bike is an emotional purchase justified by fake logic.
+</role>
+
+<task>Create a narrative plan for a ${bike1Name} vs ${bike2Name} column.</task>
 
 ${serializeContextForPrompt(ctx)}
 
@@ -50,42 +55,46 @@ ${allQuotes.map((q, i) => `Q${i + 1}: "${q.text.slice(0, 80)}..." - ${q.author},
 </available_quotes>
 
 <planning_rules>
-1. story_angle: One sentence capturing the central tension
-2. hook_strategy: Use the recommended "${hookRecommendation.strategy}" OR choose different if data strongly suggests otherwise
-3. hook_elements: Specific, not generic. Use Indian cities, real scenarios
-4. truth_bomb: Single most surprising insight from data - NOT generic
-5. quote_allocation: Assign quote numbers (Q1, Q2...) to sections. Max 20 total, 2-3 per section
-6. tension_points: 3-4 trade-offs that create reader tension
-7. matrix_focus_areas: Top 5 comparison dimensions based on persona priorities
-8. contrarian_angle: Why someone might HATE the winner
-9. closing_insight: Unexpected truth to end with (quotable)
-10. callbacks: Elements to reference across sections
+1. story_angle: Define the PHILOSOPHICAL conflict (Thematic Anchor). Don't just compare bikes; compare the types of people who ride them (e.g., "Logic vs. Emotion").
+2. hook_strategy: SELECT the strategy that best fits the data (use the suggestion if it fits):
+   - "WhatsApp Debate" (The Group Chat War): Start mid-argument. Genuine conflict.
+   - "Unexpected Truth" (The Confession): Admit a bias the bike destroyed.
+   - "Specific Scenario" (The Traffic Signal Moment): A sensory-rich instant that defines the experience.
+   - "Price Paradox" (Wallet vs. Ego): The grim reality of EMI vs. the social flex.
+3. hook_elements: Must contain SENSORY ANCHORS (heat, vibration, noise) and Indian road specifics (potholes, autos, heat).
+4. truth_bomb: The single most uncomfortable data point. Pick a side based on data; avoid being "balanced."
+5. quote_allocation: Assign quote numbers (Q1, Q2...). Treat quotes as "Voices": The Mechanic (reliability), The Pillion (comfort), The Banker (cost).
+6. tension_points: 3-4 "Friction Points." Not just cons, but things that make a rider scream inside their helmet.
+7. matrix_focus_areas: Top 5 dimensions that IGNORE THE BROCHURE. Focus on "Real World Metrics" (e.g., "Overtaking Confidence" instead of "Torque").
+8. contrarian_angle: Why the "Winner" might be the wrong choice for 30% of buyers (The Devil's Advocate).
+9. closing_insight: A final sentence that references the opening hook but flips the perspective.
+10. callbacks: Elements to reference across sections for cohesion.
 </planning_rules>
 
 <anti_patterns>
-❌ BAD story_angle: "A comparison of two popular bikes"
-✅ GOOD story_angle: "The battle between refined reliability and raw character"
+❌ BAD story_angle: "Comparing the Classic 350 and the H'ness CB350."
+✅ GOOD story_angle: "The battle between a cult you join and a machine you own."
 
-❌ BAD truth_bomb: "Both bikes have their pros and cons"
-✅ GOOD truth_bomb: "The 'premium' bike has 40% more service complaints in year 2"
+❌ BAD truth_bomb: "The Honda is smoother, but the Enfield has character."
+✅ GOOD truth_bomb: "The Honda is technically perfect, which is exactly why it feels sterile compared to the Enfield's charming imperfections."
 
-❌ BAD hook_elements: { scenario: "Buying a bike", tension: "Hard choice", promise: "We'll help" }
-✅ GOOD hook_elements: { scenario: "₹2.8L EMI vs ₹2.2L upfront, 3AM on BikeDekho", tension: "Wife thinks it's about money. It isn't.", promise: "We rode both for 2000km. Here's what matters." }
+❌ BAD hook_elements: { scenario: "Riding in the city", tension: "Traffic is bad", promise: "Which bike handles it?" }
+✅ GOOD hook_elements: { scenario: "Stuck at the Silk Board junction, 38°C heat", tension: "My wrist hurts on the KTM, the guy on the Hero looks happy", promise: "Why 'Performance' implies suffering." }
 
-❌ BAD matrix_focus_areas: ["Performance", "Comfort", "Value"]
-✅ GOOD matrix_focus_areas: ["Engine Character at 80kmph Cruise", "Bangalore Traffic Survival", "Real-World Fuel Costs", "Service Center Proximity", "Pillion Comfort Score"]
+❌ BAD matrix_focus_areas: ["Mileage", "Suspension", "Looks"]
+✅ GOOD matrix_focus_areas: ["Kitna Deti Hai (Real World)", "Spine Health on Potholes", "Head-turn factor at the signal"]
 </anti_patterns>
 
 <schema>
 {
-  "story_angle": "string - central narrative tension",
+  "story_angle": "string - central narrative tension / thematic anchor",
   "hook_strategy": "WhatsApp Debate|Unexpected Truth|Specific Scenario|Price Paradox",
   "hook_elements": {
-    "scenario": "specific situation with details",
-    "tension": "what's at stake",
-    "promise": "what reader will learn"
+    "scenario": "specific situation with sensory details",
+    "tension": "what is at stake emotionally or financially",
+    "promise": "what the reader will learn about themselves"
   },
-  "truth_bomb": "most surprising insight from the data",
+  "truth_bomb": "most surprising/uncomfortable insight from the data",
   "quote_allocation": {
     "hook": ["Q1", "Q2"],
     "matrix_engine": ["Q3", "Q4", "Q5"],
@@ -170,4 +179,4 @@ function extractAllQuotesForAllocation(insights: InsightExtractionResult): Array
 /**
  * System prompt for narrative planning
  */
-export const NARRATIVE_PLANNER_SYSTEM = 'You are an expert motorcycle journalist. Plan compelling narratives based on real data. Output only valid JSON.';
+export const NARRATIVE_PLANNER_SYSTEM = 'You are a cynical, expert motorcycle columnist. Plan compelling narratives based on real data. Output only valid JSON.';
