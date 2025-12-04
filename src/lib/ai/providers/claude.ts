@@ -70,13 +70,14 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
   }
   
   /**
-   * OPTIMIZED: Parallel extraction with Haiku model
-   * 2-3x faster than original extractInsights method
+   * OPTIMIZED: Parallel extraction with configurable model
+   * Uses user-selected model or falls back to task default
    */
   async extractInsightsOptimized(
     bike1Name: string,
     bike2Name: string,
-    forumData: any
+    forumData: any,
+    modelId?: string
   ): Promise<InsightExtractionResult> {
     if (!this.client) {
       throw new Error("Claude API not configured. Check ANTHROPIC_API_KEY in .env.local");
@@ -85,9 +86,11 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
     const startTime = Date.now();
     console.log(`[Claude-Optimized] Starting parallel extraction for ${bike1Name} vs ${bike2Name}`);
     
-    // Get Haiku model config
-    const modelConfig = getModelForTask('extraction');
-    console.log(`[Claude-Optimized] Using model: ${modelConfig.model} (fast extraction mode)`);
+    // Get model config - use passed modelId or fall back to task default
+    const modelConfig = modelId 
+      ? getModelApiConfig('extraction', modelId)
+      : getModelForTask('extraction');
+    console.log(`[Claude-Optimized] Using model: ${modelConfig.model}`);
     
     try {
       // Split data by bike
@@ -139,6 +142,7 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
   
   /**
    * Extract insights for a single bike (used in parallel)
+   * Uses streaming to handle long-running operations (required for Claude 4.5)
    */
   private async extractSingleBikeOptimized(
     bikeName: string,
@@ -150,7 +154,10 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
     // Build optimized prompt with few-shot examples
     const prompt = buildSingleBikeExtractionPrompt(bikeName, bikeData);
     
-    const response = await this.client!.messages.create({
+    // Use streaming to handle long-running operations (required for Claude 4.5 models)
+    let fullText = '';
+    
+    const stream = this.client!.messages.stream({
       model: modelConfig.model,
       max_tokens: modelConfig.maxTokens,
       temperature: modelConfig.temperature,
@@ -161,13 +168,19 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
       }]
     });
     
-    const content = response.content[0];
-    if (content.type !== 'text') {
+    // Collect streamed response
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        fullText += event.delta.text;
+      }
+    }
+    
+    if (!fullText) {
       throw new Error('Expected text response from Claude');
     }
     
     // Parse JSON response
-    let jsonText = content.text.trim();
+    let jsonText = fullText.trim();
     // Remove markdown fences if present
     jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     
@@ -262,11 +275,14 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
         insights
       );
       
-      // Call Claude with higher token limit for verdict generation
+      // Call Claude with higher token limit for verdict generation (streaming for Claude 4.5)
       const verdictMaxTokens = Math.max(this.maxTokens, 8192);
       console.log(`[Claude] Using ${verdictMaxTokens} max tokens for verdict generation`);
       
-      const response = await this.client.messages.create({
+      let fullText = '';
+      let stopReason = '';
+      
+      const stream = this.client.messages.stream({
         model: this.model,
         max_tokens: verdictMaxTokens,
         messages: [{
@@ -276,19 +292,26 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
         system: "You are an expert motorcycle advisor for Indian buyers. You make clear, evidence-backed recommendations—no fence-sitting. You always respond with valid JSON."
       });
       
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          fullText += event.delta.text;
+        }
+        if (event.type === 'message_delta' && event.delta.stop_reason) {
+          stopReason = event.delta.stop_reason;
+        }
+      }
+      
       // Check if response was truncated
-      if (response.stop_reason === "max_tokens") {
+      if (stopReason === "max_tokens") {
         console.error('[Claude] Response was truncated due to max_tokens limit');
         throw new Error("Claude response was truncated. The verdicts are incomplete. Increase ANTHROPIC_MAX_TOKENS in .env.local to at least 8192.");
       }
       
-      // Extract JSON from response
-      const content = response.content[0];
-      if (content.type !== "text") {
+      if (!fullText) {
         throw new Error("Expected text response from Claude");
       }
       
-      let jsonText = content.text.trim();
+      let jsonText = fullText.trim();
       
       // Remove markdown code fences if present
       if (jsonText.startsWith('```')) {
@@ -525,7 +548,10 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
       const modelConfig = getModelApiConfig('personas');
       console.log(`[Claude-Optimized] Using ${modelConfig.model} with ${modelConfig.maxTokens} max tokens, temp ${modelConfig.temperature}`);
       
-      const response = await this.client.messages.create({
+      // Use streaming for Claude 4.5 models
+      let fullText = '';
+      
+      const stream = this.client.messages.stream({
         model: modelConfig.model,
         max_tokens: modelConfig.maxTokens,
         temperature: modelConfig.temperature,
@@ -536,13 +562,18 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
         }]
       });
       
-      const content = response.content[0];
-      if (content.type !== 'text') {
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          fullText += event.delta.text;
+        }
+      }
+      
+      if (!fullText) {
         throw new Error('Expected text response from Claude');
       }
       
       // Parse JSON
-      let jsonText = content.text.trim();
+      let jsonText = fullText.trim();
       jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       
       const parsed = JSON.parse(jsonText);
@@ -556,7 +587,6 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
       
       console.log(`[Claude-Optimized] ✅ Persona generation complete in ${processingTime}ms (${Math.round(processingTime/1000)}s)`);
       console.log(`[Claude-Optimized] Generated ${parsed.personas.length} personas`);
-      console.log(`[Claude-Optimized] Usage: ${response.usage.input_tokens} input, ${response.usage.output_tokens} output tokens`);
       
       return {
         personas: parsed.personas,
@@ -700,7 +730,10 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
     // Get model config from central registry
     const modelConfig = getModelApiConfig('verdicts');
     
-    const response = await this.client!.messages.create({
+    // Use streaming for Claude 4.5 models
+    let fullText = '';
+    
+    const stream = this.client!.messages.stream({
       model: modelConfig.model,
       max_tokens: modelConfig.maxTokens,
       temperature: modelConfig.temperature,
@@ -711,13 +744,18 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
       }]
     });
     
-    const content = response.content[0];
-    if (content.type !== 'text') {
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        fullText += event.delta.text;
+      }
+    }
+    
+    if (!fullText) {
       throw new Error('Expected text response from Claude');
     }
     
     // Parse JSON
-    let jsonText = content.text.trim();
+    let jsonText = fullText.trim();
     jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     
     const verdict = JSON.parse(jsonText);

@@ -510,13 +510,15 @@ export function getAllTaskConfigs(): Record<TaskType, TaskConfig & { model: Mode
  * Get model string and config ready for API calls
  * This is the primary function to use when making AI API calls
  */
-export function getModelApiConfig(task: TaskType): {
+export function getModelApiConfig(task: TaskType, overrideModelId?: string): {
   model: string;
   maxTokens: number;
   temperature: number;
 } {
   const config = getTaskConfig(task);
-  const model = getModelById(config.modelId);
+  // Use override model if provided, otherwise use task default
+  const modelId = overrideModelId || config.modelId;
+  const model = getModelById(modelId);
   
   return {
     model: model?.modelString || 'claude-sonnet-4-5-20250929',

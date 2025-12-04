@@ -111,10 +111,12 @@ export async function POST(request: NextRequest) {
     
     // ===== USE FACTORY PATTERN - Consistent with other routes =====
     // Factory handles model selection, provider routing, and prompt selection
+    // Pass modelId from UI for user-selected model override
     const insights = await extractInsightsOptimized(
       body.bike1Name,
       body.bike2Name,
-      combinedData
+      combinedData,
+      body.modelId
     );
     
     // ===== VALIDATION & QUALITY CHECK =====

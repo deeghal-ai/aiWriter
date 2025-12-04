@@ -29,6 +29,39 @@ const getArticleWritingConfig = () => getModelApiConfig('article_writing');
 const getArticlePlanningConfig = () => getModelApiConfig('article_planning');
 const getArticleCoherenceConfig = () => getModelApiConfig('article_coherence');
 
+// Helper to call Claude with streaming (required for Claude 4.5 models)
+async function callClaudeWithStreaming(
+  client: Anthropic,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+  messages: Anthropic.MessageParam[],
+  system?: string
+): Promise<string> {
+  let fullText = '';
+  
+  const streamParams: Anthropic.MessageStreamParams = {
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    messages,
+  };
+  
+  if (system) {
+    streamParams.system = system;
+  }
+  
+  const stream = client.messages.stream(streamParams);
+  
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      fullText += event.delta.text;
+    }
+  }
+  
+  return fullText;
+}
+
 interface ArticleGenerationRequest {
   bike1Name: string;
   bike2Name: string;
@@ -359,22 +392,22 @@ async function generateNarrativePlan(
     verdicts
   );
 
-  // Use planning model from registry (structured output, faster)
+  // Use planning model from registry (with streaming for Claude 4.5)
   const planningConfig = getArticlePlanningConfig();
-  const response = await client.messages.create({
-    model: planningConfig.model,
-    max_tokens: planningConfig.maxTokens,
-    temperature: planningConfig.temperature,
-    system: NARRATIVE_PLANNER_SYSTEM,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const text = await callClaudeWithStreaming(
+    client,
+    planningConfig.model,
+    planningConfig.maxTokens,
+    planningConfig.temperature,
+    [{ role: 'user', content: prompt }],
+    NARRATIVE_PLANNER_SYSTEM
+  );
 
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from AI');
+  if (!text) {
+    throw new Error('Unexpected empty response from AI');
   }
 
-  const cleanedJson = cleanJsonResponse(content.text);
+  const cleanedJson = cleanJsonResponse(text);
   
   try {
     const parsed = JSON.parse(cleanedJson);
@@ -432,17 +465,15 @@ async function generateSection(
       throw new Error(`Unknown section type: ${sectionType}`);
   }
 
-  // Use writing model from registry
+  // Use writing model from registry (with streaming for Claude 4.5)
   const writingConfig = getArticleWritingConfig();
-  const response = await client.messages.create({
-    model: writingConfig.model,
-    max_tokens: writingConfig.maxTokens,
-    temperature: writingConfig.temperature,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = response.content[0];
-  return content.type === 'text' ? content.text : '';
+  return callClaudeWithStreaming(
+    client,
+    writingConfig.model,
+    writingConfig.maxTokens,
+    writingConfig.temperature,
+    [{ role: 'user', content: prompt }]
+  );
 }
 
 async function generateMatrixSection(
@@ -465,17 +496,15 @@ async function generateMatrixSection(
     allocatedQuotes
   );
 
-  // Use writing model from registry
+  // Use writing model from registry (with streaming for Claude 4.5)
   const matrixConfig = getArticleWritingConfig();
-  const response = await client.messages.create({
-    model: matrixConfig.model,
-    max_tokens: 1500, // Smaller for individual matrix sections
-    temperature: matrixConfig.temperature,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = response.content[0];
-  return content.type === 'text' ? content.text : '';
+  return callClaudeWithStreaming(
+    client,
+    matrixConfig.model,
+    1500, // Smaller for individual matrix sections
+    matrixConfig.temperature,
+    [{ role: 'user', content: prompt }]
+  );
 }
 
 async function runCoherencePass(
@@ -485,21 +514,21 @@ async function runCoherencePass(
 ): Promise<CoherenceEdits> {
   const prompt = buildCoherencePrompt(sections, narrativePlan);
 
-  // Use coherence model from registry (structured output, faster)
+  // Use coherence model from registry (with streaming for Claude 4.5)
   const coherenceConfig = getArticleCoherenceConfig();
-  const response = await client.messages.create({
-    model: coherenceConfig.model,
-    max_tokens: coherenceConfig.maxTokens,
-    temperature: coherenceConfig.temperature,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const text = await callClaudeWithStreaming(
+    client,
+    coherenceConfig.model,
+    coherenceConfig.maxTokens,
+    coherenceConfig.temperature,
+    [{ role: 'user', content: prompt }]
+  );
 
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from AI');
+  if (!text) {
+    throw new Error('Unexpected empty response from AI');
   }
 
-  const cleanedJson = cleanJsonResponse(content.text);
+  const cleanedJson = cleanJsonResponse(text);
   
   try {
     return JSON.parse(cleanedJson);

@@ -113,13 +113,14 @@ export async function extractInsightsWithRetry(
 }
 
 /**
- * OPTIMIZED: Extract insights with parallel processing and Haiku model
- * 2-3x faster than standard extraction
+ * OPTIMIZED: Extract insights with parallel processing
+ * Uses user-selected model or falls back to task default
  */
 export async function extractInsightsOptimized(
   bike1Name: string,
   bike2Name: string,
   forumData: any,
+  modelId?: string,
   maxRetries = 2  // Fewer retries needed with parallel approach
 ) {
   let lastError: Error | null = null;
@@ -133,7 +134,7 @@ export async function extractInsightsOptimized(
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await (provider as any).extractInsightsOptimized(bike1Name, bike2Name, forumData);
+      return await (provider as any).extractInsightsOptimized(bike1Name, bike2Name, forumData, modelId);
     } catch (error: any) {
       lastError = error;
       

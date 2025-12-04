@@ -27,6 +27,39 @@ export const maxDuration = 300; // 5 minutes for article generation
 // Get model config from central registry
 const getArticleWritingConfig = () => getModelApiConfig('article_writing');
 
+// Helper to call Claude with streaming (required for Claude 4.5 models)
+async function callClaudeWithStreaming(
+  client: Anthropic,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+  messages: Anthropic.MessageParam[],
+  system?: string
+): Promise<string> {
+  let fullText = '';
+  
+  const streamParams: Anthropic.MessageStreamParams = {
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    messages,
+  };
+  
+  if (system) {
+    streamParams.system = system;
+  }
+  
+  const stream = client.messages.stream(streamParams);
+  
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      fullText += event.delta.text;
+    }
+  }
+  
+  return fullText;
+}
+
 interface ArticleGenerationRequest {
   bike1Name: string;
   bike2Name: string;
@@ -357,21 +390,21 @@ async function generateNarrativePlan(
     verdicts
   );
 
-  // Use writing model from central registry
+  // Use writing model from central registry (with streaming for Claude 4.5)
   const writingConfig = getArticleWritingConfig();
-  const response = await client.messages.create({
-    model: writingConfig.model,
-    max_tokens: writingConfig.maxTokens,
-    temperature: writingConfig.temperature,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const text = await callClaudeWithStreaming(
+    client,
+    writingConfig.model,
+    writingConfig.maxTokens,
+    writingConfig.temperature,
+    [{ role: 'user', content: prompt }]
+  );
 
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from AI');
+  if (!text) {
+    throw new Error('Unexpected empty response from AI');
   }
 
-  const cleanedJson = cleanJsonResponse(content.text);
+  const cleanedJson = cleanJsonResponse(text);
   
   try {
     const parsed = JSON.parse(cleanedJson);
@@ -438,17 +471,15 @@ async function generateSection(
       throw new Error(`Unknown section type: ${sectionType}`);
   }
 
-  // Use writing model from central registry
+  // Use writing model from central registry (with streaming for Claude 4.5)
   const sectionConfig = getArticleWritingConfig();
-  const response = await client.messages.create({
-    model: sectionConfig.model,
-    max_tokens: sectionConfig.maxTokens,
-    temperature: sectionConfig.temperature,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = response.content[0];
-  return content.type === 'text' ? content.text : '';
+  return callClaudeWithStreaming(
+    client,
+    sectionConfig.model,
+    sectionConfig.maxTokens,
+    sectionConfig.temperature,
+    [{ role: 'user', content: prompt }]
+  );
 }
 
 async function generateMatrixSection(
@@ -484,17 +515,15 @@ async function generateMatrixSection(
     allocatedQuotes
   );
 
-  // Use writing model from central registry
+  // Use writing model from central registry (with streaming for Claude 4.5)
   const matrixConfig = getArticleWritingConfig();
-  const response = await client.messages.create({
-    model: matrixConfig.model,
-    max_tokens: 1500, // Smaller for individual matrix sections
-    temperature: matrixConfig.temperature,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = response.content[0];
-  return content.type === 'text' ? content.text : '';
+  return callClaudeWithStreaming(
+    client,
+    matrixConfig.model,
+    1500, // Smaller for individual matrix sections
+    matrixConfig.temperature,
+    [{ role: 'user', content: prompt }]
+  );
 }
 
 async function runCoherencePass(
@@ -504,21 +533,21 @@ async function runCoherencePass(
 ): Promise<CoherenceEdits> {
   const prompt = buildCoherencePrompt(sections, narrativePlan);
 
-  // Use coherence model from central registry
-  const coherenceConfig = getArticleWritingConfig(); // Uses article_writing for coherence in non-streaming
-  const response = await client.messages.create({
-    model: coherenceConfig.model,
-    max_tokens: 1500,
-    temperature: 0.3, // Lower temperature for editing
-    messages: [{ role: 'user', content: prompt }],
-  });
+  // Use coherence model from central registry (with streaming for Claude 4.5)
+  const coherenceConfig = getArticleWritingConfig();
+  const text = await callClaudeWithStreaming(
+    client,
+    coherenceConfig.model,
+    1500,
+    0.3, // Lower temperature for editing
+    [{ role: 'user', content: prompt }]
+  );
 
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from AI');
+  if (!text) {
+    throw new Error('Unexpected empty response from AI');
   }
 
-  const cleanedJson = cleanJsonResponse(content.text);
+  const cleanedJson = cleanJsonResponse(text);
   return JSON.parse(cleanedJson);
 }
 

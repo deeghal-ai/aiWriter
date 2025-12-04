@@ -230,17 +230,23 @@ Keep the reviewer's voice and specific details. Output MUST be in English only. 
 TRANSCRIPT:
 ${transcript}`;
 
-    // Call Haiku directly
-    const response = await client.messages.create({
+    // Call Haiku with streaming (required for Claude 4.5 models)
+    let summary = '';
+    
+    const stream = client.messages.stream({
       model: model.modelString,
       max_tokens: taskConfig.maxTokens,
       temperature: taskConfig.temperature,
       messages: [{ role: 'user', content: prompt }],
     });
     
-    const summary = response.content[0]?.type === 'text' 
-      ? response.content[0].text.trim() 
-      : '';
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        summary += event.delta.text;
+      }
+    }
+    
+    summary = summary.trim();
     
     if (summary && summary.length > 100) {
       console.log(`[TranscriptProcessor] ✅ Summarized: ${transcript.length} → ${summary.length} chars`);
