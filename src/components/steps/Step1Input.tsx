@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Bike, Youtube, MessageSquare, Database, Sparkles, Clock, Zap } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
 export function Step1Input() {
@@ -14,160 +14,163 @@ export function Step1Input() {
   const setCurrentStep = useAppStore((state) => state.setCurrentStep);
   const markStepComplete = useAppStore((state) => state.markStepComplete);
   
-  // Initialize from store if available
   const [bike1, setBike1] = useState('');
   const [bike2, setBike2] = useState('');
   const [sources, setSources] = useState({
-    xbhp: false,
-    teamBhp: false,
-    reddit: false,
-    youtube: true,
-    instagram: false,
-    internal: false  // BikeDekho internal data
+    xbhp: false, teamBhp: false, reddit: false, youtube: true, instagram: false, internal: false
   });
   
-  // Restore existing comparison data when returning to this step
   useEffect(() => {
     if (comparison) {
       setBike1(comparison.bike1 || '');
       setBike2(comparison.bike2 || '');
-      if (comparison.researchSources) {
-        setSources(comparison.researchSources);
-      }
+      if (comparison.researchSources) setSources(comparison.researchSources);
     }
   }, [comparison]);
   
   const handleSubmit = () => {
-    // Save to store
-    setComparison({
-      bike1,
-      bike2,
-      researchSources: sources
-    });
-    
-    // Mark step as complete and move to next
+    setComparison({ bike1, bike2, researchSources: sources });
     markStepComplete(1);
     setCurrentStep(2);
   };
   
   const isValid = bike1.trim() && bike2.trim();
+
+  const sourceOptions = [
+    { id: 'youtube', label: 'YouTube Reviews', desc: 'Video comments', icon: Youtube, recommended: true, color: 'text-red-500' },
+    { id: 'reddit', label: 'Reddit r/IndianBikes', desc: 'Forum posts', icon: MessageSquare, recommended: true, color: 'text-orange-500' },
+    { id: 'internal', label: 'BikeDekho Reviews', desc: 'Verified owners', icon: Database, badge: 'Premium', color: 'text-violet-500' }
+  ];
   
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2">Enter Comparison Bikes</h2>
-        <p className="text-slate-600">
-          Start by entering the two bikes you want to compare. We&apos;ll research them across forums and communities.
+    <div className="max-w-xl mx-auto animate-fade-in-up">
+      {/* Header */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="p-1.5 rounded-lg bg-primary/10">
+            <Bike className="w-4 h-4 text-primary" />
+          </div>
+          <span className="text-[10px] font-medium text-primary uppercase tracking-wider">Step 1</span>
+        </div>
+        <h2 className="text-xl font-semibold text-foreground mb-1">Enter Comparison Bikes</h2>
+        <p className="text-xs text-muted-foreground">
+          Enter two bikes to compare. We&apos;ll research forums and communities.
         </p>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Bike Details</CardTitle>
-          <CardDescription>
-            Enter the exact model names (e.g., &quot;TVS Apache RTX 300&quot;)
+      {/* Form Card */}
+      <Card className="shadow-soft">
+        <CardHeader className="py-3 px-4 border-b border-border/50 bg-secondary/20">
+          <CardTitle className="text-sm flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            Bike Details
+          </CardTitle>
+          <CardDescription className="text-[11px]">
+            Enter exact model names (e.g., &quot;TVS Apache RTX 300&quot;)
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        
+        <CardContent className="p-4 space-y-4">
           {/* Bike inputs */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Bike 1
+              <label className="text-[11px] font-medium text-foreground/70 mb-1 flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded bg-primary/10 text-primary text-[9px] font-bold flex items-center justify-center">1</span>
+                First Bike
               </label>
               <Input
                 placeholder="e.g., TVS Apache RTX 300"
                 value={bike1}
                 onChange={(e) => setBike1(e.target.value)}
-                className="text-lg"
+                className="h-8 text-sm"
               />
             </div>
             
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[9px] font-semibold text-muted-foreground/40 uppercase">vs</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Bike 2
+              <label className="text-[11px] font-medium text-foreground/70 mb-1 flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded bg-[hsl(85,25%,45%)]/10 text-[hsl(85,25%,40%)] text-[9px] font-bold flex items-center justify-center">2</span>
+                Second Bike
               </label>
               <Input
                 placeholder="e.g., Royal Enfield Scram 440"
                 value={bike2}
                 onChange={(e) => setBike2(e.target.value)}
-                className="text-lg"
+                className="h-8 text-sm"
               />
             </div>
           </div>
           
           {/* Research sources */}
-          <div className="pt-4 border-t">
-            <h3 className="font-medium mb-3">Research Sources</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Select which forums and communities to search
-            </p>
+          <div className="pt-3 border-t border-border/50">
+            <h3 className="text-xs font-medium text-foreground mb-1">Research Sources</h3>
+            <p className="text-[10px] text-muted-foreground mb-2">Select forums to search</p>
             
-            <div className="space-y-3">
-              {[
-                { id: 'youtube', label: 'YouTube Reviews & Comments', description: 'Top videos with owner comments', recommended: true },
-                { id: 'reddit', label: 'Reddit r/IndianBikes', description: 'Forum discussions and experiences', recommended: true },
-                { id: 'internal', label: 'BikeDekho User Reviews', description: 'Verified owner reviews & expert insights', recommended: true, badge: 'Premium' }
-              ].map((source) => (
-                <div key={source.id} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
-                  <Checkbox
-                    id={source.id}
-                    checked={sources[source.id as keyof typeof sources]}
-                    onCheckedChange={(checked) =>
-                      setSources((prev) => ({ ...prev, [source.id]: checked as boolean }))
-                    }
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-<label
-                                      htmlFor={source.id}
-                                      className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
-                                    >
-                                      {source.label}
-                                      {source.recommended && !('badge' in source) && (
-                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Recommended</span>
-                                      )}
-                                      {'badge' in source && source.badge && (
-                                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">{source.badge}</span>
-                                      )}
-                                    </label>
-                    <p className="text-xs text-slate-500 mt-1">{source.description}</p>
-                  </div>
-                </div>
-              ))}
-              
-              <p className="text-xs text-slate-500 mt-2 italic">
-                💡 Tip: Enable both sources for richer insights and more accurate personas
+            <div className="space-y-1.5">
+              {sourceOptions.map((source) => {
+                const Icon = source.icon;
+                const isChecked = sources[source.id as keyof typeof sources];
+                
+                return (
+                  <label 
+                    key={source.id} 
+                    htmlFor={source.id}
+                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                      isChecked ? 'bg-primary/5 border-primary/25' : 'bg-white border-border/60 hover:border-border'
+                    }`}
+                  >
+                    <Checkbox
+                      id={source.id}
+                      checked={isChecked}
+                      onCheckedChange={(checked) => setSources(prev => ({ ...prev, [source.id]: checked as boolean }))}
+                      className="h-3.5 w-3.5"
+                    />
+                    <div className={`p-1 rounded bg-secondary/60 ${source.color}`}>
+                      <Icon className="w-3 h-3" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-medium text-foreground">{source.label}</span>
+                        {source.recommended && !source.badge && (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-600 px-1 py-0.5 rounded">Rec</span>
+                        )}
+                        {source.badge && (
+                          <span className="text-[9px] bg-violet-100 text-violet-600 px-1 py-0.5 rounded">{source.badge}</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-muted-foreground">{source.desc}</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            
+            <div className="mt-2 p-1.5 rounded bg-primary/5 border border-primary/15">
+              <p className="text-[9px] text-primary/70 flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                Multiple sources = richer insights
               </p>
             </div>
           </div>
-          
-          {/* Estimated time */}
-          <div className="pt-4 border-t bg-slate-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
-            <p className="text-sm text-slate-600">
-              <strong>Estimated research time:</strong>{' '}
-              {sources.youtube && sources.reddit ? '2-4 minutes' : '1-2 minutes'}
-              {sources.youtube && sources.reddit && (
-                <span className="text-blue-600 ml-2">(Combined sources = richer data)</span>
-              )}
-            </p>
-          </div>
         </CardContent>
+        
+        {/* Footer */}
+        <div className="px-4 py-2 bg-secondary/20 border-t border-border/50 flex items-center justify-between">
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Clock className="w-3 h-3 text-primary/60" />
+            Est. time: {sources.youtube && sources.reddit ? '2-4 min' : '1-2 min'}
+          </p>
+          <Button onClick={handleSubmit} disabled={!isValid} size="sm" className="h-7 px-3 text-xs gap-1.5">
+            Start Research
+            <ArrowRight className="h-3 w-3" />
+          </Button>
+        </div>
       </Card>
-      
-      {/* Action button */}
-      <div className="mt-6 flex justify-end">
-        <Button
-          onClick={handleSubmit}
-          disabled={!isValid}
-          size="lg"
-          className="gap-2"
-        >
-          Start Research
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
     </div>
   );
 }
-

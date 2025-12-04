@@ -1,29 +1,9 @@
-/**
- * AppHeader Component
- * 
- * Modified to support:
- * - Back to home navigation
- * - Comparison title display
- * - Save status indicator
- * - New comparison button
- */
-
 'use client';
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ArrowLeft, 
-  Bike, 
-  Plus, 
-  Save, 
-  Loader2, 
-  CheckCircle2,
-  AlertCircle,
-  Cloud,
-  CloudOff
-} from 'lucide-react';
+import { ArrowLeft, Plus, Save, Loader2, Cloud, CloudOff, AlertTriangle } from 'lucide-react';
 import { useAppStore, useSaveStatus } from '@/lib/store';
 import Image from 'next/image';
 
@@ -34,159 +14,101 @@ interface AppHeaderProps {
   comparisonId?: string | null;
 }
 
-export function AppHeader({ 
-  showBackButton = false, 
-  onBack,
-  title,
-  comparisonId 
-}: AppHeaderProps) {
+export function AppHeader({ showBackButton = false, onBack, title, comparisonId }: AppHeaderProps) {
   const router = useRouter();
   const { saveComparison, resetWorkflow } = useAppStore();
   const { isSaving, lastSaved, saveError } = useSaveStatus();
 
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      router.push('/');
-    }
-  };
+  const handleBack = () => onBack ? onBack() : router.push('/');
+  const handleNewComparison = () => { resetWorkflow(); router.push('/comparison/new'); };
+  const handleManualSave = async () => { await saveComparison(); };
 
-  const handleNewComparison = () => {
-    resetWorkflow();
-    router.push('/comparison/new');
-  };
-
-  const handleManualSave = async () => {
-    await saveComparison();
-  };
-
-  // Format last saved time
   const formatLastSaved = () => {
     if (!lastSaved) return null;
-    const now = new Date();
-    const diffMs = now.getTime() - lastSaved.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    
+    const diffSecs = Math.floor((new Date().getTime() - lastSaved.getTime()) / 1000);
     if (diffSecs < 10) return 'Just now';
     if (diffSecs < 60) return `${diffSecs}s ago`;
-    if (diffMins < 60) return `${diffMins}m ago`;
-    return lastSaved.toLocaleTimeString();
+    return `${Math.floor(diffSecs / 60)}m ago`;
   };
 
-  // Render save status indicator
   const renderSaveStatus = () => {
     if (!comparisonId && !lastSaved) {
-      // New unsaved comparison
       return (
-        <div className="flex items-center gap-1.5 text-sm text-gray-500">
-          <CloudOff className="w-4 h-4" />
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-1 rounded bg-secondary/80">
+          <CloudOff className="w-3 h-3" />
           <span>Not saved</span>
         </div>
       );
     }
-
     if (isSaving) {
       return (
-        <div className="flex items-center gap-1.5 text-sm text-blue-600">
-          <Loader2 className="w-4 h-4 animate-spin" />
+        <div className="flex items-center gap-1.5 text-[11px] text-amber-600 px-2 py-1 rounded bg-amber-50">
+          <Loader2 className="w-3 h-3 animate-spin" />
           <span>Saving...</span>
         </div>
       );
     }
-
     if (saveError) {
       return (
-        <div className="flex items-center gap-1.5 text-sm text-red-600">
-          <AlertCircle className="w-4 h-4" />
-          <span>Save failed</span>
+        <div className="flex items-center gap-1.5 text-[11px] text-destructive px-2 py-1 rounded bg-destructive/10">
+          <AlertTriangle className="w-3 h-3" />
+          <span>Failed</span>
         </div>
       );
     }
-
     if (lastSaved) {
       return (
-        <div className="flex items-center gap-1.5 text-sm text-green-600">
-          <Cloud className="w-4 h-4" />
+        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 px-2 py-1 rounded bg-emerald-50">
+          <Cloud className="w-3 h-3" />
           <span>Saved {formatLastSaved()}</span>
         </div>
       );
     }
-
     return null;
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-      {/* Left section */}
-      <div className="flex items-center gap-4">
+    <header className="bg-white border-b border-border/50 px-4 py-2 flex items-center justify-between">
+      <div className="flex items-center gap-3">
         {showBackButton && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleBack}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" />
+          <Button variant="ghost" size="sm" onClick={handleBack} className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-3.5 h-3.5 mr-1" />
             Back
           </Button>
         )}
         
-        {/* Logo and title */}
-        <div className="flex items-center gap-3">
-          <Image 
-            src="/bike_dekho_logo.png" 
-            alt="BikeDekho Logo" 
-            width={32} 
-            height={32}
-            className="object-contain"
-          />
+        <div className="flex items-center gap-2">
+          <div className="bg-white p-1 rounded border border-border/50 shadow-sm">
+            <Image src="/bike_dekho_logo.png" alt="Logo" width={22} height={22} className="object-contain" />
+          </div>
           
           {title ? (
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">{title}</span>
+              <span className="font-medium text-sm text-foreground">{title}</span>
               {comparisonId && (
-                <Badge variant="outline" className="text-xs font-normal">
-                  ID: {comparisonId.slice(0, 8)}...
+                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 h-4">
+                  {comparisonId.slice(0, 8)}
                 </Badge>
               )}
             </div>
           ) : (
-            <span className="font-semibold text-gray-900">BikeDekho AI Writer</span>
+            <span className="font-medium text-sm text-foreground">BikeDekho AI Writer</span>
           )}
         </div>
       </div>
 
-      {/* Right section */}
-      <div className="flex items-center gap-4">
-        {/* Save status */}
+      <div className="flex items-center gap-2">
         {title && renderSaveStatus()}
         
-        {/* Manual save button (only show if there's a comparison in progress) */}
         {title && (
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleManualSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-1" />
-            )}
-            Save
+          <Button variant="outline" size="sm" onClick={handleManualSave} disabled={isSaving} className="h-7 px-2.5 text-xs">
+            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            <span className="ml-1">Save</span>
           </Button>
         )}
         
-        {/* New comparison button */}
-        <Button 
-          variant="default" 
-          size="sm"
-          onClick={handleNewComparison}
-        >
-          <Plus className="w-4 h-4 mr-1" />
+        <Button size="sm" onClick={handleNewComparison} className="h-7 px-2.5 text-xs">
+          <Plus className="w-3 h-3 mr-1" />
           New Comparison
         </Button>
       </div>

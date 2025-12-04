@@ -1,11 +1,5 @@
 /**
  * Comparison Workspace Page
- * 
- * This is the main workspace for working on a bike comparison.
- * - /comparison/new - Start a new comparison
- * - /comparison/[id] - Continue an existing comparison
- * 
- * Loads the saved state from database and renders the appropriate step.
  */
 
 'use client';
@@ -15,10 +9,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { StepSidebar } from '@/components/layout/StepSidebar';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Import all step components
 import { Step1Input } from '@/components/steps/Step1Input';
 import { Step2Scrape } from '@/components/steps/Step2Scrape';
 import { Step3Extract } from '@/components/steps/Step3Extract';
@@ -34,64 +27,36 @@ export default function ComparisonPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const { 
-    comparisonId,
-    currentStep, 
-    comparison,
-    loadComparison, 
-    resetWorkflow,
-    setComparisonId,
-  } = useAppStore();
-
-  // Use ref to track if we've already initialized for this ID
-  // This prevents re-running loadComparison on every render
+  const { comparisonId, currentStep, comparison, loadComparison, resetWorkflow, setComparisonId } = useAppStore();
   const initializedIdRef = useRef<string | null>(null);
   
   useEffect(() => {
     const id = params.id as string;
+    if (initializedIdRef.current === id) return;
     
-    // Skip if we've already initialized for this ID
-    if (initializedIdRef.current === id) {
-      return;
-    }
-    
-    const initializeWorkspace = async () => {
+    const init = async () => {
       setLoading(true);
       setError(null);
-      
       try {
         if (id === 'new') {
-          // New comparison - reset state to fresh
           resetWorkflow();
           setComparisonId(null);
         } else {
-          // Load existing comparison from database
           const success = await loadComparison(id);
-          
-          if (!success) {
-            setError('Comparison not found or failed to load');
-          }
+          if (!success) setError('Comparison not found');
         }
-        // Mark this ID as initialized
         initializedIdRef.current = id;
-      } catch (err) {
-        console.error('Error initializing workspace:', err);
-        setError('Failed to load comparison');
+      } catch {
+        setError('Failed to load');
       } finally {
         setLoading(false);
       }
     };
+    init();
+  }, [params.id, loadComparison, resetWorkflow, setComparisonId]);
 
-    initializeWorkspace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]); // Only re-run when the URL ID changes
+  const handleBack = () => router.push('/');
 
-  // Handle back navigation
-  const handleBack = () => {
-    router.push('/');
-  };
-
-  // Render the current step component
   const renderStep = () => {
     switch (currentStep) {
       case 1: return <Step1Input />;
@@ -106,34 +71,32 @@ export default function ComparisonPage() {
     }
   };
 
-  // Loading state
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-        <p className="text-gray-600">
-          {params.id === 'new' ? 'Preparing workspace...' : 'Loading comparison...'}
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-xs text-muted-foreground mt-3">
+          {params.id === 'new' ? 'Preparing...' : 'Loading...'}
         </p>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Unable to Load Comparison
-          </h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={handleBack}>
-              Back to Home
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <div className="text-center max-w-xs bg-white p-6 rounded-xl shadow-soft border border-border/50">
+          <div className="w-10 h-10 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center mx-auto mb-3">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+          </div>
+          <h2 className="text-sm font-medium text-foreground mb-1">Unable to Load</h2>
+          <p className="text-xs text-muted-foreground mb-4">{error}</p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={handleBack} size="sm" className="h-7 px-2.5 text-xs gap-1">
+              <Home className="w-3 h-3" />Back
             </Button>
-            <Button onClick={() => window.location.reload()}>
-              Try Again
+            <Button onClick={() => window.location.reload()} size="sm" className="h-7 px-2.5 text-xs gap-1">
+              <RefreshCw className="w-3 h-3" />Retry
             </Button>
           </div>
         </div>
@@ -141,32 +104,25 @@ export default function ComparisonPage() {
     );
   }
 
-  // Get display title
   const getTitle = () => {
-    if (comparison?.bike1 && comparison?.bike2) {
-      return `${comparison.bike1} vs ${comparison.bike2}`;
-    }
+    if (comparison?.bike1 && comparison?.bike2) return `${comparison.bike1} vs ${comparison.bike2}`;
     return 'New Comparison';
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header with back button and comparison title */}
-      <AppHeader 
-        showBackButton={true}
-        onBack={handleBack}
-        title={getTitle()}
-        comparisonId={comparisonId}
-      />
+    <div className="flex flex-col h-screen bg-background">
+      <AppHeader showBackButton onBack={handleBack} title={getTitle()} comparisonId={comparisonId} />
       
-      {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar with step navigation */}
         <StepSidebar />
         
-        {/* Main step content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto p-6">
+        <main className="flex-1 overflow-y-auto bg-gradient-mesh relative">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-1/4 w-64 h-64 bg-primary/[0.03] rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-[hsl(85,25%,45%)]/[0.03] rounded-full blur-3xl" />
+          </div>
+          
+          <div className="relative max-w-4xl mx-auto p-5">
             {renderStep()}
           </div>
         </main>
@@ -174,4 +130,3 @@ export default function ComparisonPage() {
     </div>
   );
 }
-

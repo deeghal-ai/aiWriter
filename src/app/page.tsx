@@ -1,8 +1,5 @@
 /**
  * Homepage - Comparison List
- * 
- * Displays all saved comparisons with progress indicators.
- * Allows creating new comparisons and continuing existing ones.
  */
 
 'use client';
@@ -12,29 +9,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Plus, 
-  FileText, 
-  Clock, 
-  CheckCircle2, 
-  Trash2, 
-  Loader2,
-  AlertCircle
-} from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, Trash2, Loader2, AlertCircle, Sparkles, ArrowRight, Zap } from 'lucide-react';
 import Image from 'next/image';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Types
 interface ComparisonSummary {
   id: string;
   bike1_name: string;
@@ -47,17 +28,7 @@ interface ComparisonSummary {
   updated_at: string | null;
 }
 
-// Step names for display
-const STEP_NAMES = [
-  'Input', 
-  'Scrape', 
-  'Extract', 
-  'Personas', 
-  'Verdicts', 
-  'Article', 
-  'Polish', 
-  'Review'
-];
+const STEP_NAMES = ['Input', 'Scrape', 'Extract', 'Personas', 'Verdicts', 'Article', 'Polish', 'Review'];
 
 export default function HomePage() {
   const [comparisons, setComparisons] = useState<ComparisonSummary[]>([]);
@@ -66,295 +37,249 @@ export default function HomePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
-  // Fetch comparisons on mount
-  useEffect(() => {
-    fetchComparisons();
-  }, []);
+  useEffect(() => { fetchComparisons(); }, []);
 
   const fetchComparisons = async () => {
     try {
       setLoading(true);
       setError(null);
-      
       const res = await fetch('/api/comparisons');
-      
-      if (!res.ok) {
-        throw new Error('Failed to fetch comparisons');
-      }
-      
+      if (!res.ok) throw new Error('Failed to fetch');
       const result = await res.json();
       setComparisons(result.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching comparisons:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNewComparison = () => {
-    router.push('/comparison/new');
-  };
-
-  const handleOpenComparison = (id: string) => {
-    router.push(`/comparison/${id}`);
-  };
+  const handleNewComparison = () => router.push('/comparison/new');
+  const handleOpenComparison = (id: string) => router.push(`/comparison/${id}`);
 
   const handleDeleteComparison = async (id: string) => {
     try {
       setDeletingId(id);
-      
-      const res = await fetch(`/api/comparisons/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to delete comparison');
-      }
-      
-      // Remove from local state
+      const res = await fetch(`/api/comparisons/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
       setComparisons(prev => prev.filter(c => c.id !== id));
     } catch (err) {
-      console.error('Error deleting comparison:', err);
-      alert('Failed to delete comparison');
+      console.error(err);
+      alert('Failed to delete');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const getProgressPercentage = (completedSteps: number[] | null) => {
-    if (!completedSteps || completedSteps.length === 0) return 0;
-    return Math.round((completedSteps.length / 8) * 100);
-  };
+  const getProgress = (steps: number[] | null) => steps?.length ? Math.round((steps.length / 8) * 100) : 0;
 
-  const getStatusBadge = (status: string | null, completedSteps: number[] | null) => {
-    const steps = completedSteps || [];
-    
-    if (status === 'completed' || steps.length === 8) {
-      return <Badge className="bg-green-500 hover:bg-green-600">Completed</Badge>;
+  const getStatusBadge = (status: string | null, steps: number[] | null) => {
+    const completed = steps || [];
+    if (status === 'completed' || completed.length === 8) {
+      return <Badge variant="success" className="text-[10px] px-1.5 py-0"><CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />Done</Badge>;
     }
-    if (status === 'archived') {
-      return <Badge variant="secondary">Archived</Badge>;
-    }
-    if (steps.length > 0) {
-      return <Badge className="bg-blue-500 hover:bg-blue-600">In Progress</Badge>;
-    }
-    return <Badge variant="outline">Draft</Badge>;
+    if (status === 'archived') return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Archived</Badge>;
+    if (completed.length > 0) return <Badge variant="warning" className="text-[10px] px-1.5 py-0"><Zap className="w-2.5 h-2.5 mr-0.5" />Active</Badge>;
+    return <Badge variant="outline" className="text-[10px] px-1.5 py-0">Draft</Badge>;
   };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = new Date().getTime() - new Date(dateString).getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${Math.floor(diffHours / 24)}d`;
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-8">
+    <div className="min-h-screen bg-background bg-gradient-mesh relative">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 -left-32 w-64 h-64 bg-[hsl(85,25%,45%)]/5 rounded-full blur-3xl" />
+      </div>
+      
+      <div className="relative max-w-6xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Image 
-              src="/bike_dekho_logo.png" 
-              alt="BikeDekho Logo" 
-              width={72} 
-              height={72}
-              className="object-contain"
-              priority
-            />
+        <header className="flex items-center justify-between mb-8 animate-fade-in-up">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/10 rounded-xl blur-lg" />
+              <div className="relative bg-white p-2 rounded-xl border border-border/50 shadow-soft">
+                <Image src="/bike_dekho_logo.png" alt="Logo" width={36} height={36} className="object-contain" priority />
+              </div>
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">BikeDekho AI Writing assistant</h1>
-              <p className="text-gray-600 mt-1">Create research-driven bike comparison articles</p>
+              <h1 className="text-xl font-bold">
+                <span className="text-gradient">BikeDekho</span>
+                <span className="text-foreground"> AI Writer</span>
+              </h1>
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-primary" />
+                Research-driven bike comparison articles
+              </p>
             </div>
           </div>
-          <Button onClick={handleNewComparison} size="lg">
-            <Plus className="w-5 h-5 mr-2" />
+          
+          <Button onClick={handleNewComparison} size="sm" className="h-8 px-3 text-xs gap-1.5">
+            <Plus className="w-3.5 h-3.5" />
             New Comparison
           </Button>
-        </div>
+        </header>
 
         {/* Error State */}
         {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="flex items-center gap-3 py-4">
-              <AlertCircle className="w-5 h-5 text-red-500" />
-              <p className="text-red-700">{error}</p>
-              <Button variant="outline" size="sm" onClick={fetchComparisons}>
-                Retry
-              </Button>
+          <Card className="mb-4 border-destructive/40 bg-destructive/5">
+            <CardContent className="flex items-center gap-3 py-2 px-3">
+              <AlertCircle className="w-4 h-4 text-destructive" />
+              <p className="text-xs text-destructive flex-1">{error}</p>
+              <Button variant="outline" size="sm" onClick={fetchComparisons} className="h-6 px-2 text-[10px]">Retry</Button>
             </CardContent>
           </Card>
         )}
 
         {/* Loading State */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-            <p className="text-gray-500">Loading comparisons...</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-xs text-muted-foreground mt-3">Loading...</p>
           </div>
         ) : comparisons.length === 0 ? (
           /* Empty State */
-          <Card className="text-center py-12">
-            <CardContent>
-              <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No comparisons yet</h3>
-              <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                Start by creating your first bike comparison. Our AI will help you research 
-                and write a comprehensive article.
-              </p>
-              <Button onClick={handleNewComparison} size="lg">
-                <Plus className="w-5 h-5 mr-2" />
-                Create Your First Comparison
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-16 animate-fade-in-up">
+            <div className="bg-white rounded-2xl p-6 shadow-soft border border-border/50 mb-4">
+              <FileText className="w-12 h-12 text-muted-foreground/30" />
+            </div>
+            <h3 className="text-base font-medium text-foreground mb-1">No comparisons yet</h3>
+            <p className="text-xs text-muted-foreground text-center max-w-sm mb-4">
+              Create your first bike comparison. AI will research and write a comprehensive article.
+            </p>
+            <Button onClick={handleNewComparison} size="sm" className="h-8 px-4 text-xs gap-2">
+              <Plus className="w-3.5 h-3.5" />
+              Create First Comparison
+            </Button>
+          </div>
         ) : (
           /* Comparisons Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {comparisons.map((comparison) => (
-              <Card 
-                key={comparison.id} 
-                className="group cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-blue-200"
-                onClick={() => handleOpenComparison(comparison.id)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg leading-tight pr-2">
-                      {comparison.display_name || `${comparison.bike1_name} vs ${comparison.bike2_name}`}
-                    </CardTitle>
-                    {getStatusBadge(comparison.status, comparison.completed_steps)}
-                  </div>
-                  <CardDescription className="flex items-center gap-2 text-sm">
-                    <Clock className="w-3 h-3" />
-                    Updated {formatDate(comparison.updated_at)}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {/* Progress bar */}
-                  <div className="mb-3">
-                    <div className="flex justify-between text-sm text-gray-500 mb-1">
-                      <span>Progress</span>
-                      <span>{getProgressPercentage(comparison.completed_steps)}%</span>
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-medium text-foreground/70">Your Comparisons</h2>
+              <span className="text-[10px] text-muted-foreground">{comparisons.length} total</span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {comparisons.map((comparison, index) => (
+                <Card 
+                  key={comparison.id} 
+                  className="group cursor-pointer card-hover animate-fade-in-up opacity-0"
+                  style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
+                  onClick={() => handleOpenComparison(comparison.id)}
+                >
+                  <CardHeader className="p-3 pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-xs font-medium leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                        {comparison.display_name || `${comparison.bike1_name} vs ${comparison.bike2_name}`}
+                      </CardTitle>
+                      {getStatusBadge(comparison.status, comparison.completed_steps)}
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${getProgressPercentage(comparison.completed_steps)}%` }}
-                      />
+                    <CardDescription className="flex items-center gap-1 text-[10px]">
+                      <Clock className="w-2.5 h-2.5" />
+                      {formatDate(comparison.updated_at)}
+                    </CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="p-3 pt-0 space-y-2">
+                    {/* Progress */}
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-medium">{getProgress(comparison.completed_steps)}%</span>
+                      </div>
+                      <div className="w-full bg-secondary rounded-full h-1">
+                        <div className="h-full progress-gradient rounded-full transition-all" style={{ width: `${getProgress(comparison.completed_steps)}%` }} />
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Current step indicator */}
-                  <div className="text-sm text-gray-600 mb-3">
-                    {comparison.completed_steps?.length === 8 ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="w-4 h-4" />
-                        All steps completed
-                      </span>
-                    ) : (
-                      <>
-                        Current: <span className="font-medium text-gray-900">
-                          Step {comparison.current_step || 1} - {STEP_NAMES[(comparison.current_step || 1) - 1]}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Step progress pills */}
-                  <div className="flex gap-1 mb-3">
-                    {STEP_NAMES.map((name, idx) => {
-                      const stepNum = idx + 1;
-                      const isCurrentStep = (comparison.current_step || 1) === stepNum;
-                      const isCompleted = comparison.completed_steps?.includes(stepNum);
-                      
-                      return (
-                        <div 
-                          key={idx}
-                          className={`flex-1 h-1.5 rounded-full transition-colors ${
-                            isCurrentStep
-                              ? 'bg-blue-500'  // Current step always shows blue
-                              : isCompleted
-                              ? 'bg-green-500' // Completed steps show green
-                              : 'bg-gray-200'  // Future steps show gray
-                          }`}
-                          title={`${name}${isCompleted ? ' ✓' : ''}${isCurrentStep ? ' (current)' : ''}`}
-                        />
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Action buttons */}
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenComparison(comparison.id);
-                      }}
-                    >
-                      {comparison.completed_steps?.length === 8 ? 'View' : 'Continue'}
-                    </Button>
                     
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={deletingId === comparison.id}
-                        >
-                          {deletingId === comparison.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Comparison?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete &quot;{comparison.display_name || `${comparison.bike1_name} vs ${comparison.bike2_name}`}&quot; 
-                            and all its data. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={() => handleDeleteComparison(comparison.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Stats Footer */}
-        {!loading && comparisons.length > 0 && (
-          <div className="mt-8 text-center text-sm text-gray-500">
-            {comparisons.length} comparison{comparisons.length !== 1 ? 's' : ''} • 
-            {comparisons.filter(c => c.status === 'completed' || c.completed_steps?.length === 8).length} completed
-          </div>
+                    {/* Current step */}
+                    <div className="text-[10px]">
+                      {comparison.completed_steps?.length === 8 ? (
+                        <span className="flex items-center gap-1 text-emerald-600">
+                          <CheckCircle2 className="w-3 h-3" />Complete
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Step {comparison.current_step || 1}: <span className="text-foreground">{STEP_NAMES[(comparison.current_step || 1) - 1]}</span>
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Step pills */}
+                    <div className="flex gap-0.5">
+                      {STEP_NAMES.map((_, idx) => {
+                        const stepNum = idx + 1;
+                        const isCurrent = (comparison.current_step || 1) === stepNum;
+                        const isCompleted = comparison.completed_steps?.includes(stepNum);
+                        return (
+                          <div 
+                            key={idx}
+                            className={`flex-1 h-1 rounded-full ${isCurrent ? 'bg-primary' : isCompleted ? 'bg-emerald-500' : 'bg-secondary'}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Actions */}
+                    <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                      <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-primary hover:text-primary/80 gap-1"
+                        onClick={(e) => { e.stopPropagation(); handleOpenComparison(comparison.id); }}>
+                        {comparison.completed_steps?.length === 8 ? 'View' : 'Continue'}
+                        <ArrowRight className="w-2.5 h-2.5" />
+                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => e.stopPropagation()} disabled={deletingId === comparison.id}>
+                            {deletingId === comparison.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()} className="max-w-sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-sm">Delete?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-xs">
+                              This will permanently delete this comparison.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="h-7 text-xs">Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="h-7 text-xs bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteComparison(comparison.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {/* Stats */}
+            <div className="mt-6 text-center">
+              <p className="text-[10px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1 mr-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  {comparisons.filter(c => c.status !== 'completed' && c.completed_steps?.length !== 8).length} active
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {comparisons.filter(c => c.status === 'completed' || c.completed_steps?.length === 8).length} done
+                </span>
+              </p>
+            </div>
+          </>
         )}
       </div>
     </div>

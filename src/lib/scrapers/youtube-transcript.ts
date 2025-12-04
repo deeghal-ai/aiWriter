@@ -21,54 +21,222 @@ interface KeyMoment {
 }
 
 /**
- * Fetches YouTube video transcript using the youtube-transcript library
- * Works without authentication for most Indian motorcycle videos
+ * Fetches YouTube video transcript directly from YouTube
+ * Custom implementation that handles various transcript formats
  */
 export async function fetchTranscriptWithLibrary(
   videoId: string
 ): Promise<ProcessedTranscript | null> {
   try {
-    // Using dynamic import for the youtube-transcript package
-    const { YoutubeTranscript } = await import('youtube-transcript');
+    // First try the library
+    const libraryResult = await fetchWithLibrary(videoId);
+    if (libraryResult) return libraryResult;
     
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-      lang: 'en',  // Try English first
-    }).catch(() => 
-      // Fallback to Hindi
-      YoutubeTranscript.fetchTranscript(videoId, { lang: 'hi' })
-    ).catch(() => 
-      // Fallback to auto-generated
-      YoutubeTranscript.fetchTranscript(videoId)
-    );
+    // Fallback to direct fetch
+    const directResult = await fetchTranscriptDirect(videoId);
+    if (directResult) return directResult;
+    
+    return null;
+  } catch (error: any) {
+    console.error(`[Transcript] ❌ Unexpected error for ${videoId}:`, error?.message || error);
+    return null;
+  }
+}
+
+/**
+ * Try fetching with the youtube-transcript library
+ */
+async function fetchWithLibrary(videoId: string): Promise<ProcessedTranscript | null> {
+  try {
+    const { YoutubeTranscript } = await import('youtube-transcript');
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
     
     if (!transcript || transcript.length === 0) {
-      return null;
+      return null; // Silent fail, we'll try direct fetch
     }
     
+    console.log(`[Transcript] ✅ Library got ${transcript.length} segments for ${videoId}`);
+    
     const segments: TranscriptSegment[] = transcript.map((item: any) => ({
-      text: item.text,
-      start: item.offset / 1000,  // Convert to seconds
-      duration: item.duration / 1000
+      text: decodeHtmlEntities(item.text || ''),
+      start: (item.offset || 0) / 1000,
+      duration: (item.duration || 0) / 1000
     }));
     
     const fullText = segments.map(s => s.text).join(' ');
-    const duration = segments[segments.length - 1].start + segments[segments.length - 1].duration;
-    
-    // Extract key moments based on common review sections
-    const keyMoments = extractKeyMoments(segments);
+    const duration = segments.length > 0 
+      ? segments[segments.length - 1].start + segments[segments.length - 1].duration
+      : 0;
     
     return {
       fullText,
       segments,
       duration,
-      language: 'en',
-      keyMoments
+      language: 'auto',
+      keyMoments: extractKeyMoments(segments)
     };
-    
-  } catch (error) {
-    console.error(`Transcript fetch failed for ${videoId}:`, error);
+  } catch (error: any) {
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('disabled')) {
+      console.log(`[Transcript] ⚠️ Transcript disabled for ${videoId}`);
+      return null;
+    }
+    // Don't log - we'll try direct fetch
     return null;
   }
+}
+
+/**
+ * Direct fetch from YouTube's timedtext API
+ */
+async function fetchTranscriptDirect(videoId: string): Promise<ProcessedTranscript | null> {
+  try {
+    // Fetch the video page to get caption tracks
+    const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const pageResponse = await fetch(videoPageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    
+    if (!pageResponse.ok) {
+      return null;
+    }
+    
+    const pageHtml = await pageResponse.text();
+    
+    // Extract captions data from the page
+    const captionsMatch = pageHtml.match(/"captions":\s*(\{[^}]+\}[^}]+\})/);
+    if (!captionsMatch) {
+      console.log(`[Transcript] ⚠️ No captions found in page for ${videoId}`);
+      return null;
+    }
+    
+    // Try to find the caption track URL
+    const baseUrlMatch = pageHtml.match(/"baseUrl":\s*"([^"]+)"/);
+    if (!baseUrlMatch) {
+      console.log(`[Transcript] ⚠️ No caption URL found for ${videoId}`);
+      return null;
+    }
+    
+    // Unescape the URL
+    const captionUrl = baseUrlMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/');
+    
+    // Fetch the transcript
+    const transcriptResponse = await fetch(captionUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    if (!transcriptResponse.ok) {
+      return null;
+    }
+    
+    const transcriptXml = await transcriptResponse.text();
+    
+    // Parse both old and new XML formats
+    const segments = parseTranscriptXml(transcriptXml);
+    
+    if (segments.length === 0) {
+      console.log(`[Transcript] ⚠️ Could not parse transcript XML for ${videoId}`);
+      return null;
+    }
+    
+    console.log(`[Transcript] ✅ Direct fetch got ${segments.length} segments for ${videoId}`);
+    
+    const fullText = segments.map(s => s.text).join(' ');
+    const duration = segments[segments.length - 1].start + segments[segments.length - 1].duration;
+    
+    return {
+      fullText,
+      segments,
+      duration,
+      language: 'auto',
+      keyMoments: extractKeyMoments(segments)
+    };
+    
+  } catch (error: any) {
+    console.log(`[Transcript] ⚠️ Direct fetch failed for ${videoId}: ${error?.message?.substring(0, 50) || 'Unknown'}`);
+    return null;
+  }
+}
+
+/**
+ * Parse transcript XML with multiple format support
+ */
+function parseTranscriptXml(xml: string): TranscriptSegment[] {
+  const segments: TranscriptSegment[] = [];
+  
+  // Try format 1: <text start="X" dur="Y">content</text>
+  const format1Regex = /<text start="([^"]*)" dur="([^"]*)"[^>]*>([^<]*)<\/text>/g;
+  let match;
+  
+  while ((match = format1Regex.exec(xml)) !== null) {
+    segments.push({
+      text: decodeHtmlEntities(match[3]),
+      start: parseFloat(match[1]),
+      duration: parseFloat(match[2])
+    });
+  }
+  
+  if (segments.length > 0) return segments;
+  
+  // Try format 2: <p t="X" d="Y">content</p> (newer format)
+  const format2Regex = /<p t="(\d+)" d="(\d+)"[^>]*>([^<]*)<\/p>/g;
+  
+  while ((match = format2Regex.exec(xml)) !== null) {
+    segments.push({
+      text: decodeHtmlEntities(match[3]),
+      start: parseInt(match[1]) / 1000, // milliseconds to seconds
+      duration: parseInt(match[2]) / 1000
+    });
+  }
+  
+  if (segments.length > 0) return segments;
+  
+  // Try format 3: JSON3 format (sometimes YouTube returns JSON)
+  try {
+    const jsonMatch = xml.match(/\{"wireMagic".*\}/);
+    if (jsonMatch) {
+      const data = JSON.parse(jsonMatch[0]);
+      if (data.events) {
+        for (const event of data.events) {
+          if (event.segs) {
+            const text = event.segs.map((s: any) => s.utf8 || '').join('');
+            if (text.trim()) {
+              segments.push({
+                text: decodeHtmlEntities(text),
+                start: (event.tStartMs || 0) / 1000,
+                duration: (event.dDurationMs || 0) / 1000
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // Not JSON format
+  }
+  
+  return segments;
+}
+
+/**
+ * Decode HTML entities in transcript text
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    .replace(/\n/g, ' ')
+    .trim();
 }
 
 /**

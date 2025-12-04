@@ -106,7 +106,8 @@ export async function scrapeYouTubeEnhanced(
         
         videos.push(videoData);
         
-        console.log(`[Enhanced] Fetched: ${videoData.title.substring(0, 50)}... (Trust: ${videoData.trustScore}, Comments: ${videoData.comments.length})`);
+        const transcriptStatus = videoData.metadata.hasTranscript ? '📝' : '';
+        console.log(`[Enhanced] Fetched: ${videoData.title.substring(0, 50)}... (Trust: ${videoData.trustScore}, Comments: ${videoData.comments.length}) ${transcriptStatus}`);
         
         // Small delay to be respectful
         await delay(150);
@@ -184,8 +185,14 @@ export async function scrapeComparisonVideos(
       }
       
       videos.push(videoData);
+      
+      const transcriptStatus = videoData.metadata.hasTranscript ? '📝' : '';
+      console.log(`[Enhanced] Comparison: ${videoData.title.substring(0, 50)}... ${transcriptStatus}`);
     }
   }
+  
+  const withTranscripts = videos.filter(v => v.metadata.hasTranscript).length;
+  console.log(`[Enhanced] Comparison videos: ${videos.length} total, ${withTranscripts} with transcripts`);
   
   return videos.slice(0, 5);  // Max 5 comparison videos
 }

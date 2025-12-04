@@ -135,10 +135,8 @@ export function Step2Scrape() {
     const allComplete = restoredStatuses.every(s => s.status === 'complete');
     
     if (allComplete && hasExistingData) {
-      // All data exists, just display it
+      // All data exists, just display it - useEffect will mark step complete
       setIsComplete(true);
-      // Mark step as complete so it remains accessible when navigating away
-      markStepComplete(2);
     } else if (!hasExistingData) {
       // No existing data at all, start scraping
       startScraping();
@@ -147,13 +145,19 @@ export function Step2Scrape() {
       // User can manually click "Restart Scraping" if they want fresh data
       const anyComplete = restoredStatuses.some(s => s.status === 'complete');
       if (anyComplete) {
+        // useEffect will mark step complete when isComplete becomes true
         setIsComplete(true);
-        // Mark step as complete so it remains accessible when navigating away
-        markStepComplete(2);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comparison]);
+  
+  // Separate effect to mark step complete - avoids updating store during render
+  useEffect(() => {
+    if (isComplete) {
+      markStepComplete(2);
+    }
+  }, [isComplete, markStepComplete]);
   
   const updateStatus = (source: string, update: Partial<ScrapingStatus>) => {
     setStatuses(prev => 
@@ -370,16 +374,16 @@ export function Step2Scrape() {
     // Mark scraping as complete
     isScrapingInProgress.current = false;
     
-    // Check if scraping completed successfully
-    setStatuses(prev => {
-      const hasSuccess = prev.some(s => s.status === 'complete');
-      if (hasSuccess) {
-        setIsComplete(true);
-        // Mark step as complete so it remains accessible when navigating away
-        markStepComplete(2);
-      }
-      return prev;
-    });
+    // Check if scraping completed successfully - defer state update to avoid render conflicts
+    setTimeout(() => {
+      setStatuses(prev => {
+        const hasSuccess = prev.some(s => s.status === 'complete');
+        if (hasSuccess) {
+          setIsComplete(true);
+        }
+        return prev;
+      });
+    }, 0);
   };
   
   // Start scraping for specific sources (used by restart)
@@ -411,16 +415,16 @@ export function Step2Scrape() {
     // Mark scraping as complete
     isScrapingInProgress.current = false;
     
-    // Check if scraping completed successfully
-    setStatuses(prev => {
-      const hasSuccess = prev.some(s => s.status === 'complete');
-      if (hasSuccess) {
-        setIsComplete(true);
-        // Mark step as complete so it remains accessible when navigating away
-        markStepComplete(2);
-      }
-      return prev;
-    });
+    // Check if scraping completed successfully - defer state update to avoid render conflicts
+    setTimeout(() => {
+      setStatuses(prev => {
+        const hasSuccess = prev.some(s => s.status === 'complete');
+        if (hasSuccess) {
+          setIsComplete(true);
+        }
+        return prev;
+      });
+    }, 0);
   };
   
   const restartScraping = () => {
