@@ -563,6 +563,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
             youtube: (data.research_sources || []).includes('youtube'),
             reddit: (data.research_sources || []).includes('reddit'),
             internal: (data.research_sources || []).includes('internal'),
+            webSearch: (data.research_sources || []).includes('webSearch'),
           },
         } : null,
         singleVehicleCorpus: data.corpus || null,
@@ -604,6 +605,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       if (state.singleVehicle.researchSources?.youtube) researchSources.push('youtube');
       if (state.singleVehicle.researchSources?.reddit) researchSources.push('reddit');
       if (state.singleVehicle.researchSources?.internal) researchSources.push('internal');
+      if (state.singleVehicle.researchSources?.webSearch) researchSources.push('webSearch');
       
       // Prepare payload
       const payload = {
