@@ -35,8 +35,8 @@ export async function GET(
       .eq('share_token', token)
       .single();
     
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (error || !data) {
+      if (error?.code === 'PGRST116') {
         return NextResponse.json(
           { error: 'Shared content not found or link has expired' },
           { status: 404 }
