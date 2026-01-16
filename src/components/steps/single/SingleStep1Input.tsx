@@ -77,7 +77,7 @@ export function SingleStep1Input() {
             Vehicle Name
           </CardTitle>
           <CardDescription className="text-xs">
-            Enter the bike or car name as commonly searched (e.g., "Maruti Suzuki Grand Vitara", "Royal Enfield Hunter 350")
+            Enter the bike or car name as commonly searched (e.g., &quot;Maruti Suzuki Grand Vitara&quot;, &quot;Royal Enfield Hunter 350&quot;)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -210,7 +210,7 @@ export function SingleStep1Input() {
       
       {/* Help text */}
       <p className="text-center text-[10px] text-muted-foreground mt-4">
-        The scraped data will be used to extract insights for model page sections like "Quick Decision", "Owner Pulse", etc.
+        The scraped data will be used to extract insights for model page sections like &quot;Quick Decision&quot;, &quot;Owner Pulse&quot;, etc.
       </p>
     </div>
   );

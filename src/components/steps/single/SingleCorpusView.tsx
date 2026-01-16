@@ -451,7 +451,7 @@ export function SingleCorpusView() {
             <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
               <Globe className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-blue-700">
-                <span className="font-medium">Web search data</span> is used to populate variant options, pricing, and lifecycle information in the generated content. This provides accurate, up-to-date data beyond what's available in reviews and discussions.
+                <span className="font-medium">Web search data</span> is used to populate variant options, pricing, and lifecycle information in the generated content. This provides accurate, up-to-date data beyond what&apos;s available in reviews and discussions.
               </div>
             </div>
           </TabsContent>
