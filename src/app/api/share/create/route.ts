@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     const shareToken = generateShareToken();
     
     // Update the research with the new share token
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('single_vehicle_research')
       .update({ share_token: shareToken })
       .eq('id', body.researchId);
