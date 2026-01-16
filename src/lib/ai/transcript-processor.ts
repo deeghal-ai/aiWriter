@@ -163,7 +163,7 @@ export async function translateHindiBatch(texts: string[]): Promise<string[]> {
     const translated = result.choices?.[0]?.message?.content?.trim() || '';
     
     // Parse translated results back
-    const translatedParts = translated.split(/\[\d+\]/).filter(Boolean).map(s => s.trim());
+    const translatedParts = translated.split(/\[\d+\]/).filter(Boolean).map((s: string) => s.trim());
     
     // Map back to original array
     const output = [...texts];
