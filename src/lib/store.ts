@@ -20,6 +20,11 @@ import type {
   ArticleSection,
   QualityReport,
   QualityCheck,
+  SingleVehicleResearch,
+  SingleVehicleCorpus,
+  SingleVehicleScrapingProgress,
+  SingleVehiclePageContent,
+  SingleVehicleGenerationProgress,
 } from './types';
 
 // Types for scraped data storage
@@ -29,6 +34,14 @@ interface ScrapedData {
   xbhp?: any;
   youtube?: any;
   internal?: any;  // BikeDekho internal data (user reviews, expert insights)
+}
+
+// Single vehicle scraped data storage
+interface SingleVehicleScrapedData {
+  youtube?: any;
+  webSearch?: any;
+  reddit?: any;
+  internal?: any;
 }
 
 interface AppState {
@@ -81,6 +94,21 @@ interface AppState {
   lastSaved: Date | null;
   saveError: string | null;
   
+  // ============ SINGLE VEHICLE STATE ============
+  singleVehicleId: string | null;
+  singleVehicle: SingleVehicleResearch | null;
+  singleVehicleCurrentStep: number;
+  singleVehicleCompletedSteps: number[];
+  singleVehicleScrapingProgress: SingleVehicleScrapingProgress[];
+  singleVehicleScrapedData: SingleVehicleScrapedData;
+  singleVehicleCorpus: SingleVehicleCorpus | null;
+  singleVehicleContent: SingleVehiclePageContent | null;
+  singleVehicleGenerationProgress: SingleVehicleGenerationProgress[];
+  isGeneratingSingleVehicleContent: boolean;
+  isSavingSingleVehicle: boolean;
+  lastSavedSingleVehicle: Date | null;
+  saveSingleVehicleError: string | null;
+  
   // ============ DATABASE ACTIONS ============
   setComparisonId: (id: string | null) => void;
   loadComparison: (id: string) => Promise<boolean>;
@@ -108,6 +136,25 @@ interface AppState {
   setFinalArticle: (article: string) => void;
   resetArticleGeneration: () => void;
   resetWorkflow: () => void;
+  
+  // ============ SINGLE VEHICLE ACTIONS ============
+  setSingleVehicleId: (id: string | null) => void;
+  setSingleVehicle: (vehicle: SingleVehicleResearch | null) => void;
+  setSingleVehicleCurrentStep: (step: number) => void;
+  markSingleVehicleStepComplete: (step: number) => void;
+  setSingleVehicleScrapingProgress: (progress: SingleVehicleScrapingProgress[]) => void;
+  setSingleVehicleScrapedData: (source: 'youtube' | 'reddit' | 'internal', data: any) => void;
+  getSingleVehicleScrapedData: (source: 'youtube' | 'reddit' | 'internal') => any;
+  setSingleVehicleCorpus: (corpus: SingleVehicleCorpus | null) => void;
+  setSingleVehicleContent: (content: SingleVehiclePageContent | null) => void;
+  setSingleVehicleGenerationProgress: (progress: SingleVehicleGenerationProgress[]) => void;
+  setIsGeneratingSingleVehicleContent: (isGenerating: boolean) => void;
+  resetSingleVehicleWorkflow: () => void;
+  
+  // ============ SINGLE VEHICLE DATABASE ACTIONS ============
+  loadSingleVehicleResearch: (id: string) => Promise<boolean>;
+  saveSingleVehicleResearch: () => Promise<string | null>;
+  deleteSingleVehicleResearch: (id: string) => Promise<boolean>;
 }
 
 // Initial state values
@@ -134,6 +181,20 @@ const initialState = {
   isSaving: false,
   lastSaved: null,
   saveError: null,
+  // Single vehicle initial state
+  singleVehicleId: null,
+  singleVehicle: null,
+  singleVehicleCurrentStep: 1,
+  singleVehicleCompletedSteps: [] as number[],
+  singleVehicleScrapingProgress: [] as SingleVehicleScrapingProgress[],
+  singleVehicleScrapedData: {} as SingleVehicleScrapedData,
+  singleVehicleCorpus: null,
+  singleVehicleContent: null,
+  singleVehicleGenerationProgress: [] as SingleVehicleGenerationProgress[],
+  isGeneratingSingleVehicleContent: false,
+  isSavingSingleVehicle: false,
+  lastSavedSingleVehicle: null,
+  saveSingleVehicleError: null,
 };
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -399,12 +460,249 @@ export const useAppStore = create<AppState>()((set, get) => ({
   }),
   
   resetWorkflow: () => set({ ...initialState }),
+  
+  // ============ SINGLE VEHICLE ACTIONS ============
+  
+  setSingleVehicleId: (id) => set({ singleVehicleId: id }),
+  
+  setSingleVehicle: (vehicle) => set({ singleVehicle: vehicle }),
+  
+  setSingleVehicleCurrentStep: (step) => set({ singleVehicleCurrentStep: step }),
+  
+  markSingleVehicleStepComplete: (step) =>
+    set((state) => ({
+      singleVehicleCompletedSteps: [...new Set([...state.singleVehicleCompletedSteps, step])]
+    })),
+  
+  setSingleVehicleScrapingProgress: (progress) => set({ singleVehicleScrapingProgress: progress }),
+  
+  setSingleVehicleScrapedData: (source, data) =>
+    set((state) => ({
+      singleVehicleScrapedData: {
+        ...state.singleVehicleScrapedData,
+        [source]: data,
+      },
+    })),
+  
+  getSingleVehicleScrapedData: (source) => get().singleVehicleScrapedData[source],
+  
+  setSingleVehicleCorpus: (corpus) => set({ singleVehicleCorpus: corpus }),
+  
+  setSingleVehicleContent: (content) => set({ singleVehicleContent: content }),
+  
+  setSingleVehicleGenerationProgress: (progress) => set({ singleVehicleGenerationProgress: progress }),
+  
+  setIsGeneratingSingleVehicleContent: (isGenerating) => set({ isGeneratingSingleVehicleContent: isGenerating }),
+  
+  resetSingleVehicleWorkflow: () => set({
+    singleVehicleId: null,
+    singleVehicle: null,
+    singleVehicleCurrentStep: 1,
+    singleVehicleCompletedSteps: [],
+    singleVehicleScrapingProgress: [],
+    singleVehicleScrapedData: {},
+    singleVehicleCorpus: null,
+    singleVehicleContent: null,
+    singleVehicleGenerationProgress: [],
+    isGeneratingSingleVehicleContent: false,
+    isSavingSingleVehicle: false,
+    lastSavedSingleVehicle: null,
+    saveSingleVehicleError: null,
+  }),
+  
+  // ============ SINGLE VEHICLE DATABASE ACTIONS ============
+  
+  /**
+   * Load a single vehicle research from the database
+   */
+  loadSingleVehicleResearch: async (id: string) => {
+    try {
+      const response = await fetch(`/api/single-research/${id}`);
+      
+      if (!response.ok) {
+        console.error('Failed to load single vehicle research:', response.statusText);
+        return false;
+      }
+      
+      const data = await response.json();
+      
+      // Determine the correct step based on what data actually exists
+      // This handles cases where current_step in database is outdated
+      let determinedStep = data.current_step || 1;
+      let completedSteps = data.completed_steps || [];
+      
+      // If we have generated_content, we should be at step 5 (Export/View)
+      if (data.generated_content) {
+        determinedStep = 5;
+        // Ensure all steps are marked complete
+        completedSteps = [1, 2, 3, 4, 5];
+      }
+      // If we have corpus with actual data, we should be at least at step 3 (Corpus) or 4 (Generate)
+      else if (data.corpus && data.corpus.metadata) {
+        // Check if corpus has any actual data
+        const hasCorpusData = data.corpus.youtube || data.corpus.reddit || 
+                             data.corpus.internal || data.corpus.webSearch;
+        if (hasCorpusData) {
+          // If step 4 is in completed_steps, go to step 4, otherwise step 3
+          determinedStep = completedSteps.includes(4) ? 4 : 3;
+          // Ensure steps 1, 2, 3 are complete
+          if (!completedSteps.includes(1)) completedSteps.push(1);
+          if (!completedSteps.includes(2)) completedSteps.push(2);
+          if (!completedSteps.includes(3)) completedSteps.push(3);
+        }
+      }
+      
+      // Map database fields to store state
+      set({
+        singleVehicleId: data.id,
+        singleVehicleCurrentStep: determinedStep,
+        singleVehicleCompletedSteps: completedSteps,
+        singleVehicle: data.vehicle_name ? {
+          vehicle: data.vehicle_name,
+          researchSources: {
+            youtube: (data.research_sources || []).includes('youtube'),
+            reddit: (data.research_sources || []).includes('reddit'),
+            internal: (data.research_sources || []).includes('internal'),
+          },
+        } : null,
+        singleVehicleCorpus: data.corpus || null,
+        singleVehicleContent: data.generated_content || null,
+        // Reset transient state
+        singleVehicleScrapingProgress: [],
+        singleVehicleScrapedData: {},
+        singleVehicleGenerationProgress: [],
+        isGeneratingSingleVehicleContent: false,
+        isSavingSingleVehicle: false,
+        saveSingleVehicleError: null,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error loading single vehicle research:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Save current single vehicle research state to database
+   * Creates new entry if singleVehicleId is null, otherwise updates
+   */
+  saveSingleVehicleResearch: async () => {
+    const state = get();
+    
+    // Must have vehicle name to save
+    if (!state.singleVehicle?.vehicle) {
+      set({ saveSingleVehicleError: 'Cannot save: vehicle name is required' });
+      return null;
+    }
+    
+    set({ isSavingSingleVehicle: true, saveSingleVehicleError: null });
+    
+    try {
+      // Build research sources array from object
+      const researchSources: string[] = [];
+      if (state.singleVehicle.researchSources?.youtube) researchSources.push('youtube');
+      if (state.singleVehicle.researchSources?.reddit) researchSources.push('reddit');
+      if (state.singleVehicle.researchSources?.internal) researchSources.push('internal');
+      
+      // Prepare payload
+      const payload = {
+        vehicle_name: state.singleVehicle.vehicle,
+        research_sources: researchSources,
+        current_step: state.singleVehicleCurrentStep,
+        completed_steps: state.singleVehicleCompletedSteps,
+        corpus: state.singleVehicleCorpus,
+        generated_content: state.singleVehicleContent,
+        status: state.singleVehicleCompletedSteps.includes(5) 
+          ? 'completed' 
+          : state.singleVehicleCompletedSteps.includes(4)
+            ? 'generating'
+            : state.singleVehicleCompletedSteps.includes(3)
+              ? 'corpus_ready'
+              : state.singleVehicleCompletedSteps.includes(2)
+                ? 'scraping'
+                : 'draft',
+      };
+      
+      let response: Response;
+      
+      if (state.singleVehicleId) {
+        // Update existing entry
+        response = await fetch(`/api/single-research/${state.singleVehicleId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Create new entry
+        response = await fetch('/api/single-research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save single vehicle research');
+      }
+      
+      const result = await response.json();
+      
+      // Update singleVehicleId if this was a new entry
+      if (!state.singleVehicleId && result.id) {
+        set({ singleVehicleId: result.id });
+      }
+      
+      set({ 
+        isSavingSingleVehicle: false, 
+        lastSavedSingleVehicle: new Date(),
+        saveSingleVehicleError: null,
+      });
+      
+      return result.id || state.singleVehicleId;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save';
+      console.error('Error saving single vehicle research:', error);
+      set({ 
+        isSavingSingleVehicle: false, 
+        saveSingleVehicleError: errorMessage,
+      });
+      return null;
+    }
+  },
+  
+  /**
+   * Delete a single vehicle research from the database
+   */
+  deleteSingleVehicleResearch: async (id: string) => {
+    try {
+      const response = await fetch(`/api/single-research/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to delete single vehicle research:', response.statusText);
+        return false;
+      }
+      
+      // If deleting current research, reset state
+      if (get().singleVehicleId === id) {
+        get().resetSingleVehicleWorkflow();
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting single vehicle research:', error);
+      return false;
+    }
+  },
 }));
 
 // ============ HELPER HOOKS ============
 
 /**
- * Hook to auto-save after step completion
+ * Hook to auto-save comparisons after step completion
  * Usage: const autoSave = useAutoSave();
  *        await autoSave(); // Call after completing a step
  */
@@ -417,6 +715,34 @@ export function useAutoSave() {
       await saveComparison();
     }
   };
+}
+
+/**
+ * Hook to auto-save single vehicle research after step completion
+ * Usage: const autoSaveSingleVehicle = useAutoSaveSingleVehicle();
+ *        await autoSaveSingleVehicle(); // Call after completing a step
+ */
+export function useAutoSaveSingleVehicle() {
+  const { saveSingleVehicleResearch, singleVehicle } = useAppStore();
+  
+  return async () => {
+    // Only auto-save if we have vehicle name (minimum data)
+    if (singleVehicle?.vehicle) {
+      await saveSingleVehicleResearch();
+    }
+  };
+}
+
+/**
+ * Hook to get single vehicle save status
+ */
+export function useSingleVehicleSaveStatus() {
+  const isSaving = useAppStore((state) => state.isSavingSingleVehicle);
+  const lastSaved = useAppStore((state) => state.lastSavedSingleVehicle);
+  const saveError = useAppStore((state) => state.saveSingleVehicleError);
+  const singleVehicleId = useAppStore((state) => state.singleVehicleId);
+  
+  return { isSaving, lastSaved, saveError, singleVehicleId };
 }
 
 /**

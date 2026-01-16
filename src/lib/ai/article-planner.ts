@@ -65,7 +65,7 @@ ${allQuotes.map((q, i) => `Q${i + 1}: "${q.text.slice(0, 80)}..." - ${q.author},
 4. truth_bomb: The single most uncomfortable data point. Pick a side based on data; avoid being "balanced."
 5. quote_allocation: Assign quote numbers (Q1, Q2...). Treat quotes as "Voices": The Mechanic (reliability), The Pillion (comfort), The Banker (cost).
 6. tension_points: 3-4 "Friction Points." Not just cons, but things that make a rider scream inside their helmet.
-7. matrix_focus_areas: Top 5 dimensions that IGNORE THE BROCHURE. Focus on "Real World Metrics" (e.g., "Overtaking Confidence" instead of "Torque").
+7. matrix_focus_areas: Top 3 dimensions that IGNORE THE BROCHURE. Focus on "Real World Metrics" (e.g., "Overtaking Confidence" instead of "Torque"). ONLY 3 areas - pick the most differentiating ones.
 8. contrarian_angle: Why the "Winner" might be the wrong choice for 30% of buyers (The Devil's Advocate).
 9. closing_insight: A final sentence that references the opening hook but flips the perspective.
 10. callbacks: Elements to reference across sections for cohesion.
@@ -105,7 +105,7 @@ ${allQuotes.map((q, i) => `Q${i + 1}: "${q.text.slice(0, 80)}..." - ${q.author},
   "tension_points": [
     { "dimension": "string", "bike1_wins": "specific win", "bike2_wins": "specific counter" }
   ],
-  "matrix_focus_areas": ["Specific Area 1", "Specific Area 2", "Specific Area 3", "Specific Area 4", "Specific Area 5"],
+  "matrix_focus_areas": ["Specific Area 1", "Specific Area 2", "Specific Area 3"],
   "contrarian_angle": {
     "target_persona": "persona name who might regret winner",
     "why_they_might_hate_winner": "specific scenario where winner fails"

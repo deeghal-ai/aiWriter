@@ -116,17 +116,26 @@ ${allocatedQuotes.length > 0 ? allocatedQuotes.map((q, i) => `${i + 1}. ${q}`).j
    - For which persona
 </structure>
 
-<word_count>350-450 words for this section</word_count>
+<word_count>200-280 words for this section - be CONCISE, no padding</word_count>
 
 <anti_patterns>
 ❌ "Both bikes perform well in this category"
 ❌ "The [bike] has good [feature]"
 ❌ Only mentioning positives for one bike
+❌ Repeating bike descriptions from other sections
+❌ Re-introducing personas (they're already introduced earlier)
 
 ✅ "The Duke wins on pure rush, but the Apache wins on not cooking your thighs in Indiranagar traffic"
 ✅ Specific scenarios: "On the NH48 stretch past Nelamangala, at 100kmph cruise..."
 ✅ Clear verdict: "For 80% highway, 20% city: Duke. Flip those numbers: Apache."
 </anti_patterns>
+
+<critical_constraint>
+DO NOT repeat information covered in other sections. Assume the reader has already read:
+- The hook and truth bomb (general positioning)
+- The personas section (who the riders are)
+Focus ONLY on this specific dimension's comparison. Be surgical, not comprehensive.
+</critical_constraint>
 
 Write the section now:`;
 }

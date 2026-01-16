@@ -360,7 +360,13 @@ export type TaskType =
   | 'article_planning'     // Step 6: Plan article structure
   | 'article_writing'      // Step 6: Write article sections
   | 'article_coherence'    // Step 6: Check and improve coherence
-  | 'transcript_summarization';  // Summarize long transcripts before extraction
+  | 'transcript_summarization'  // Summarize long transcripts before extraction
+  // Single vehicle content generation tasks
+  | 'single_vehicle_owner_pulse'    // Extract owner sentiment patterns
+  | 'single_vehicle_quick_decision' // Synthesize quick decision content
+  | 'single_vehicle_scorecard'      // Generate segment rankings
+  | 'single_vehicle_competitors'    // Extract competitor analysis
+  | 'single_vehicle_timing';        // Analyze buy timing
 
 export interface TaskConfig {
   modelId: string;
@@ -376,25 +382,25 @@ export interface TaskConfig {
 const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
   extraction: {
     modelId: 'claude-sonnet-4.5',
-    temperature: 0.1,
+    temperature: 0.6,
     maxTokens: 4096,
     description: 'Extract insights from forum discussions'
   },
   personas: {
     modelId: 'claude-opus-4.5',
-    temperature: 0.3,
+    temperature: 0.6,
     maxTokens: 6144,
     description: 'Generate detailed rider personas'
   },
   verdicts: {
     modelId: 'claude-opus-4.5',
-    temperature: 0.2,
+    temperature: 0.6,
     maxTokens: 2048,
     description: 'Generate bike recommendations per persona'
   },
   article_planning: {
     modelId: 'claude-opus-4.5',
-    temperature: 0.5,
+    temperature: 0.7,
     maxTokens: 4096,
     description: 'Plan article narrative structure'
   },
@@ -412,9 +418,40 @@ const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
   },
   transcript_summarization: {
     modelId: 'claude-haiku-4.5',
-    temperature: 0.2,
+    temperature: 0.6,
     maxTokens: 2048,
     description: 'Summarize long YouTube transcripts for extraction'
+  },
+  // Single vehicle content generation tasks
+  single_vehicle_owner_pulse: {
+    modelId: 'claude-opus-4.5',
+    temperature: 0.5,
+    maxTokens: 2048,
+    description: 'Extract owner sentiment patterns from corpus'
+  },
+  single_vehicle_quick_decision: {
+    modelId: 'claude-opus-4.5',
+    temperature: 0.6,
+    maxTokens: 3072,
+    description: 'Synthesize quick decision and verdict content'
+  },
+  single_vehicle_scorecard: {
+    modelId: 'claude-opus-4.5',
+    temperature: 0.5,
+    maxTokens: 3072,
+    description: 'Generate segment category rankings'
+  },
+  single_vehicle_competitors: {
+    modelId: 'claude-opus-4.5',
+    temperature: 0.4,
+    maxTokens: 2048,
+    description: 'Extract competitor mentions and analysis'
+  },
+  single_vehicle_timing: {
+    modelId: 'claude-opus-4.5',
+    temperature: 0.5,
+    maxTokens: 2048,
+    description: 'Analyze buy timing signals'
   }
 };
 
@@ -495,7 +532,11 @@ export function resetTaskConfig(task?: TaskType): void {
 export function getAllTaskConfigs(): Record<TaskType, TaskConfig & { model: ModelDefinition }> {
   const tasks: TaskType[] = [
     'extraction', 'personas', 'verdicts', 
-    'article_planning', 'article_writing', 'article_coherence'
+    'article_planning', 'article_writing', 'article_coherence',
+    'transcript_summarization',
+    // Single vehicle tasks
+    'single_vehicle_owner_pulse', 'single_vehicle_quick_decision',
+    'single_vehicle_scorecard', 'single_vehicle_competitors', 'single_vehicle_timing'
   ];
   
   return tasks.reduce((acc, task) => {

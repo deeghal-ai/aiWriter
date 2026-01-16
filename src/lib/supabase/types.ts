@@ -14,6 +14,8 @@ import type {
   ArticleSection,
   QualityReport,
   QualityCheck,
+  SingleVehicleCorpus,
+  SingleVehiclePageContent,
 } from '../types';
 
 // Scraped data structure
@@ -114,6 +116,64 @@ export interface ComparisonSummary {
   updated_at: string | null;
 }
 
+// ============================================
+// SINGLE VEHICLE RESEARCH TYPES
+// ============================================
+
+export type SingleVehicleStatus = 'draft' | 'scraping' | 'corpus_ready' | 'generating' | 'completed' | 'archived';
+
+// Main SingleVehicleResearch type matching database schema
+export interface SingleVehicleResearchDB {
+  id: string;
+  vehicle_name: string;
+  display_name: string | null;
+  research_sources: string[] | null;
+  current_step: number | null;
+  completed_steps: number[] | null;
+  corpus: SingleVehicleCorpus | null;
+  generated_content: SingleVehiclePageContent | null;
+  status: SingleVehicleStatus | null;
+  share_token: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+// Type for creating a new single vehicle research
+export interface SingleVehicleResearchInsert {
+  vehicle_name: string;
+  research_sources?: string[];
+  current_step?: number;
+  completed_steps?: number[];
+  corpus?: SingleVehicleCorpus | null;
+  generated_content?: SingleVehiclePageContent | null;
+  status?: SingleVehicleStatus;
+  share_token?: string | null;
+}
+
+// Type for updating a single vehicle research
+export interface SingleVehicleResearchUpdate {
+  vehicle_name?: string;
+  research_sources?: string[];
+  current_step?: number;
+  completed_steps?: number[];
+  corpus?: SingleVehicleCorpus | null;
+  generated_content?: SingleVehiclePageContent | null;
+  status?: SingleVehicleStatus;
+  share_token?: string | null;
+}
+
+// Summary type for list view
+export interface SingleVehicleResearchSummary {
+  id: string;
+  vehicle_name: string;
+  display_name: string | null;
+  current_step: number | null;
+  completed_steps: number[] | null;
+  status: SingleVehicleStatus | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 // Database type definition for Supabase client
 export interface Database {
   public: {
@@ -148,6 +208,11 @@ export interface Database {
           progress?: number;
           message?: string;
         };
+      };
+      single_vehicle_research: {
+        Row: SingleVehicleResearchDB;
+        Insert: SingleVehicleResearchInsert;
+        Update: SingleVehicleResearchUpdate;
       };
     };
   };

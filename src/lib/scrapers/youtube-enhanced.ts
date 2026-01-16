@@ -517,14 +517,15 @@ export class EnhancedYouTubeScraper {
       const fileSizeMB = stats.size / (1024 * 1024);
       this.log(`[Whisper] Audio downloaded: ${fileSizeMB.toFixed(2)}MB for ${videoId}`);
       
-      // Check minimum file size - if too small, audio might be corrupted
-      if (stats.size < 50 * 1024) { // Less than 50KB
-        this.log(`[Whisper] ⚠️ Audio file too small (${stats.size} bytes), likely corrupted or empty`);
+      // Skip audio files < 500KB - likely shorts/music-only videos
+      // Pattern: 0.37MB → 18 chars, 0.07MB → 4 chars (music-only content)
+      if (stats.size < 500 * 1024) { // Less than 500KB
+        this.log(`[Whisper] ⚠️ Audio too small (${fileSizeMB.toFixed(2)}MB), skipping - likely music/shorts video`);
         return {
           videoId,
           transcript: null,
           source: 'failed',
-          error: `Audio file too small (${stats.size} bytes) - might be a shorts video or download failed`,
+          error: 'Audio too small - likely music/shorts video',
         };
       }
 
@@ -558,12 +559,8 @@ export class EnhancedYouTubeScraper {
         source: 'failed',
         error: `Whisper failed: ${errorMessage}`,
       };
-    } finally {
-      // Cleanup
-      if (audioPath) {
-        await fs.unlink(audioPath).catch(() => {});
-      }
     }
+    // Note: Audio cleanup is handled centrally in _transcribeSingle to allow Deepgram reuse
   }
 
   private async callWhisperApi(audioPath: string): Promise<string> {
@@ -681,12 +678,8 @@ export class EnhancedYouTubeScraper {
         source: 'failed',
         error: `Deepgram failed: ${error.message}`,
       };
-    } finally {
-      // Cleanup
-      if (audioPath) {
-        await fs.unlink(audioPath).catch(() => {});
-      }
     }
+    // Note: Audio cleanup is handled centrally in _transcribeSingle
   }
 
   private async callDeepgramApi(audioPath: string): Promise<{
@@ -975,42 +968,51 @@ export class EnhancedYouTubeScraper {
   private async _transcribeSingle(videoId: string): Promise<TranscriptResult> {
     this.log(`[Transcribe] Starting ${videoId}...`);
 
-    // Layer 1: Try YouTube captions first (FREE)
-    const captionResult = await this.tryYouTubeCaptions(videoId);
-    if (captionResult.transcript && captionResult.transcript.length > 100) {
-      return captionResult;
-    }
-
-    const captionError = captionResult.error || 'No usable captions';
-    this.log(`[Transcribe] YouTube captions unavailable for ${videoId}: ${captionError}`);
-
-    // Layer 2: Try Whisper API (if configured)
-    if (this.openaiApiKey && this.enableWhisper) {
-      this.log(`[Transcribe] Trying Whisper for ${videoId}...`);
-      const whisperResult = await this.tryWhisperTranscription(videoId);
-      if (whisperResult.transcript && whisperResult.transcript.length > 100) {
-        return whisperResult;
+    try {
+      // Layer 1: Try YouTube captions first (FREE)
+      const captionResult = await this.tryYouTubeCaptions(videoId);
+      if (captionResult.transcript && captionResult.transcript.length > 100) {
+        return captionResult;
       }
-      this.log(`[Transcribe] Whisper failed for ${videoId}: ${whisperResult.error}`);
-    }
 
-    // Layer 3: Try Deepgram API (if configured)
-    if (this.deepgramApiKey && this.enableDeepgram) {
-      this.log(`[Transcribe] Trying Deepgram for ${videoId}...`);
-      const deepgramResult = await this.tryDeepgramTranscription(videoId);
-      if (deepgramResult.transcript && deepgramResult.transcript.length > 100) {
-        return deepgramResult;
+      const captionError = captionResult.error || 'No usable captions';
+      this.log(`[Transcribe] YouTube captions unavailable for ${videoId}: ${captionError}`);
+
+      // Layer 2: Try Whisper API (if configured)
+      if (this.openaiApiKey && this.enableWhisper) {
+        this.log(`[Transcribe] Trying Whisper for ${videoId}...`);
+        const whisperResult = await this.tryWhisperTranscription(videoId);
+        if (whisperResult.transcript && whisperResult.transcript.length > 100) {
+          return whisperResult;
+        }
+        this.log(`[Transcribe] Whisper failed for ${videoId}: ${whisperResult.error}`);
       }
-      this.log(`[Transcribe] Deepgram failed for ${videoId}: ${deepgramResult.error}`);
-    }
 
-    // All methods failed
-    return {
-      videoId,
-      transcript: null,
-      source: 'failed',
-      error: `All transcription methods failed. Caption: ${captionError}`,
-    };
+      // Layer 3: Try Deepgram API (if configured)
+      if (this.deepgramApiKey && this.enableDeepgram) {
+        this.log(`[Transcribe] Trying Deepgram for ${videoId}...`);
+        const deepgramResult = await this.tryDeepgramTranscription(videoId);
+        if (deepgramResult.transcript && deepgramResult.transcript.length > 100) {
+          return deepgramResult;
+        }
+        this.log(`[Transcribe] Deepgram failed for ${videoId}: ${deepgramResult.error}`);
+      }
+
+      // All methods failed
+      return {
+        videoId,
+        transcript: null,
+        source: 'failed',
+        error: `All transcription methods failed. Caption: ${captionError}`,
+      };
+    } finally {
+      // Centralized audio cleanup - runs after ALL transcription attempts
+      // This allows Deepgram to reuse audio downloaded by Whisper
+      const audioPath = path.join(CONFIG.TEMP_DIR, `${videoId}.mp3`);
+      const altAudioPath = path.join(CONFIG.TEMP_DIR, `${videoId}_alt.mp3`);
+      await fs.unlink(audioPath).catch(() => {});
+      await fs.unlink(altAudioPath).catch(() => {});
+    }
   }
 
   // ==========================================================================

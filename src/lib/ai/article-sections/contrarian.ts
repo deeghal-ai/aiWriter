@@ -50,7 +50,7 @@ export function buildContrarianPrompt(
 
   return `<role>You're writing the "Why You Might Hate the Winner" section. Build TRUST through honesty.</role>
 
-<task>Write 200-300 words about why ${winningBike} might be WRONG for some buyers</task>
+<task>Write 150-200 words about why ${winningBike} might be WRONG for some buyers. Be CONCISE.</task>
 
 <winning_bike>${winningBike}</winning_bike>
 <losing_bike>${losingBike}</losing_bike>
@@ -90,12 +90,12 @@ ${winningBikeTopWeaknesses.map(w => `• ${w}`).join('\n') || '• Has real trad
 </structure>
 
 <requirements>
-1. Word count: 200-300 words
-2. List 3-4 GENUINE reasons to choose ${losingBike}
+1. Word count: 150-200 words - TIGHT, no padding
+2. List 2-3 GENUINE reasons to choose ${losingBike}
 3. Make these feel REAL, not strawmen
 4. Use specific scenarios, not vague "some people might prefer"
 5. End by validating ${losingBike} as legitimate choice
-6. Tone: Honest, not apologetic
+6. DO NOT repeat bike comparisons from Matrix sections - focus on NEW angles
 </requirements>
 
 <anti_patterns>

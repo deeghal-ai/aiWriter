@@ -75,11 +75,11 @@ ${callbacks.map(c => `• From ${c.introduce_in}: "${c.element}" → callback in
 </structure>
 
 <requirements>
-1. Word count: 150-200 words
+1. Word count: 100-150 words - TIGHT ending, not rambling
 2. Must include closing insight from narrative plan
-3. Must feel like CONCLUSION, not summary
+3. Must feel like CONCLUSION, not summary - DO NOT recap the article
 4. Must end with something QUOTABLE
-5. Optional: Include practical next step
+5. Optional: One practical next step
 6. Tie back to hook/opening if possible
 </requirements>
 

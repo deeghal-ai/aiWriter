@@ -172,6 +172,37 @@ export interface BikeInsights {
   praises: InsightCategory[];
   complaints: InsightCategory[];
   surprising_insights: string[];
+
+  // Enhanced context fields for later stages (not displayed in Extract UI)
+  // These provide richer prose context for Persona, Verdict, and Article generation
+  contextual_summary?: {
+    // Prose summary of what reviewers/owners are saying (weighted: transcripts > comments)
+    reviewer_consensus: string;      // What do professional reviewers agree on?
+    owner_consensus: string;         // What do actual owners agree on?
+    key_controversies: string;       // What do they disagree about?
+  };
+
+  // Specific real-world observations (from transcripts with higher authority)
+  real_world_observations?: {
+    daily_use: string[];            // "In Bangalore traffic, the clutch is too heavy"
+    long_distance: string[];        // "On NH44, the wind buffeting becomes tiring after 100km"
+    pillion_experience: string[];   // "My wife finds the seat narrow"
+    ownership_quirks: string[];     // "The chain needs lubrication every 500km"
+  };
+
+  // Usage patterns detected from discussions
+  usage_patterns?: {
+    primary_use_case: string;       // "Mostly city commute with occasional highway"
+    typical_daily_distance: string; // "20-30km daily"
+    common_modifications: string[]; // "Many owners add crash guards and tank pads"
+  };
+
+  // Comparison-specific context (when compared against the other bike)
+  comparison_context?: {
+    wins_against_competitor: string[];   // "Clearly better mileage than [other bike]"
+    loses_against_competitor: string[];  // "Service cost higher than [other bike]"
+    subjective_preferences: string[];    // "Some prefer RE's thump, others find it tiring"
+  };
 }
 
 export interface InsightExtractionResult {
@@ -342,3 +373,495 @@ export interface ArticleGenerationResponse {
   details?: string;
 }
 
+// ============================================
+// SINGLE VEHICLE RESEARCH TYPES
+// ============================================
+
+/**
+ * Input configuration for single vehicle research
+ */
+export interface SingleVehicleResearch {
+  vehicle: string;
+  researchSources: {
+    youtube: boolean;
+    reddit: boolean;
+    internal: boolean;
+    webSearch: boolean;
+  };
+}
+
+/**
+ * YouTube video data for single vehicle
+ */
+export interface SingleVehicleYouTubeVideo {
+  videoId: string;
+  title: string;
+  description: string;
+  channelTitle: string;
+  publishedAt: string;
+  viewCount: string;
+  transcript?: string | null;
+  transcriptKeyMoments?: Array<{ topic: string; text: string }>;
+  comments: Array<{
+    author: string;
+    text: string;
+    likeCount: number;
+    publishedAt: string;
+  }>;
+}
+
+/**
+ * Reddit post data for single vehicle
+ */
+export interface SingleVehicleRedditPost {
+  title: string;
+  url: string;
+  selftext: string;
+  author: string;
+  created_utc: number;
+  num_comments: number;
+  score: number;
+  permalink: string;
+  comments: Array<{
+    author: string;
+    body: string;
+    score: number;
+    created_utc: number;
+  }>;
+}
+
+/**
+ * Internal review data for single vehicle
+ */
+export interface SingleVehicleInternalReview {
+  id: string;
+  author: {
+    name: string;
+    isVerifiedOwner: boolean;
+    ownershipDuration?: string;
+    kmsDriven?: number;
+  };
+  title: string;
+  content: string;
+  rating?: number;
+  pros?: string[];
+  cons?: string[];
+  helpfulVotes?: number;
+  createdAt: string;
+}
+
+/**
+ * Expert insight for single vehicle
+ */
+export interface SingleVehicleExpertInsight {
+  category: string;
+  insight: string;
+  author: string;
+  isPositive: boolean;
+}
+
+/**
+ * Web search result for a single query
+ */
+export interface WebSearchResult {
+  query: string;
+  results: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    source: string;
+  }>;
+  searchedAt: string;
+}
+
+/**
+ * Complete web search data for a single vehicle
+ */
+export interface SingleVehicleWebData {
+  specs: WebSearchResult;
+  variants: WebSearchResult;
+  pricing: WebSearchResult;
+  lifecycle: WebSearchResult;
+  salesData: WebSearchResult;
+}
+
+/**
+ * Complete corpus of scraped data for a single vehicle
+ */
+export interface SingleVehicleCorpus {
+  youtube?: {
+    vehicle: string;
+    videos: SingleVehicleYouTubeVideo[];
+    total_videos: number;
+    total_comments: number;
+  };
+  reddit?: {
+    vehicle: string;
+    posts: SingleVehicleRedditPost[];
+    metadata: {
+      scraped_at: string;
+      source: string;
+      subreddit: string;
+      total_posts: number;
+      total_comments: number;
+    };
+  };
+  internal?: {
+    vehicle: string;
+    reviews: SingleVehicleInternalReview[];
+    expertInsights?: SingleVehicleExpertInsight[];
+    metadata: {
+      source: string;
+      fetchedAt: string;
+      totalReviews: number;
+      isMockData: boolean;
+    };
+  };
+  webSearch?: SingleVehicleWebData;
+  metadata: {
+    vehicle: string;
+    scrapedAt: string;
+    totalPosts: number;
+    totalComments: number;
+    sourcesUsed: string[];
+  };
+}
+
+/**
+ * Single vehicle scraping progress
+ */
+export interface SingleVehicleScrapingProgress {
+  source: string;
+  status: 'pending' | 'in-progress' | 'complete' | 'error';
+  message?: string;
+  stats?: {
+    posts?: number;
+    comments?: number;
+    videos?: number;
+    reviews?: number;
+    searches?: number;
+  };
+}
+
+/**
+ * Single vehicle workflow state
+ */
+export interface SingleVehicleState {
+  vehicle: SingleVehicleResearch | null;
+  currentStep: number;
+  completedSteps: number[];
+  scrapingProgress: SingleVehicleScrapingProgress[];
+  corpus: SingleVehicleCorpus | null;
+}
+
+// ============================================
+// SINGLE VEHICLE PAGE CONTENT TYPES
+// ============================================
+
+/**
+ * Vehicle basic information
+ */
+export interface VehicleInfo {
+  make: string;
+  model: string;
+  year: number;
+  segment: string;
+}
+
+/**
+ * Price range with optional placeholder marker
+ */
+export interface PriceRange {
+  min: string;
+  max: string;
+  minValue?: number;
+  maxValue?: number;
+  priceType?: string;
+  _placeholder?: boolean;
+  _source?: string;
+}
+
+/**
+ * Ideal buyer segment
+ */
+export interface IdealForSegment {
+  label: string;
+  icon: string;
+}
+
+/**
+ * Quick decision verdict
+ */
+export interface QuickDecisionVerdict {
+  headline: string;
+  summary: string;
+  highlightType: 'positive' | 'negative' | 'neutral';
+}
+
+/**
+ * Quick decision section - helps buyers make fast decisions
+ */
+export interface QuickDecisionSection {
+  priceRange: PriceRange;
+  idealFor: IdealForSegment[];
+  verdict: QuickDecisionVerdict;
+  perfectIf: string;
+  skipIf: string;
+  keyAdvantage: string;
+}
+
+/**
+ * Cost breakdown components
+ */
+export interface CostBreakdown {
+  exShowroom: number;
+  rto: number;
+  insurance: number;
+  accessories: number;
+  _placeholder?: boolean;
+}
+
+/**
+ * Monthly burn item
+ */
+export interface MonthlyBurnItem {
+  amount: string;
+  value: number;
+  [key: string]: any; // Allow additional properties like loanAmount, tenure, etc.
+}
+
+/**
+ * How much it really costs section
+ */
+export interface HowMuchItReallyCostsSection {
+  location: string;
+  locationDefault: boolean;
+  selectedVariant: string;
+  realOnRoadPrice: {
+    amount: string;
+    value: number;
+    breakdown: CostBreakdown;
+  };
+  monthlyBurn: {
+    emi: MonthlyBurnItem;
+    fuel: MonthlyBurnItem;
+    service: MonthlyBurnItem;
+  };
+  totalMonthly: {
+    amount: string;
+    value: number;
+  };
+  savingsNote?: {
+    text: string;
+    comparisonBasis: string;
+  };
+  ctaLink?: {
+    text: string;
+    url: string;
+  };
+  _placeholder?: boolean;
+}
+
+/**
+ * Fuel type option
+ */
+export interface FuelTypeOption {
+  label: string;
+  value: string;
+  isDefault?: boolean;
+  variants: string[];
+}
+
+/**
+ * Transmission option
+ */
+export interface TransmissionOption {
+  label: string;
+  value: string;
+  availableWith: string[];
+}
+
+/**
+ * Engine type option
+ */
+export interface EngineTypeOption {
+  label: string;
+  value: string;
+  power: string;
+  torque: string;
+  fuelType: string;
+}
+
+/**
+ * Wheel type option
+ */
+export interface WheelTypeOption {
+  label: string;
+  value: string;
+  availableOn: string[];
+}
+
+/**
+ * Hero feature
+ */
+export interface HeroFeature {
+  label: string;
+  icon: string;
+  availableFrom: string;
+}
+
+/**
+ * Variant options section
+ */
+export interface VariantOptionsSection {
+  fuelType: FuelTypeOption[];
+  transmission: TransmissionOption[];
+  engineType: EngineTypeOption[];
+  wheelTypes?: WheelTypeOption[];
+  heroFeatures: HeroFeature[];
+  cta?: {
+    text: string;
+    url: string;
+  };
+  _placeholder?: boolean;
+}
+
+/**
+ * Segment category ranking
+ */
+export interface SegmentCategory {
+  name: string;
+  rank: string;
+  rankNumber: number;
+  totalInSegment: number;
+  status: string;
+  statusType: 'positive' | 'negative' | 'neutral';
+  highlights: string[];
+}
+
+/**
+ * Segment scorecard section
+ */
+export interface SegmentScorecardSection {
+  leadingCount: number;
+  badge: string;
+  categories: SegmentCategory[];
+  summary: string;
+}
+
+/**
+ * Main competitor
+ */
+export interface MainCompetitor {
+  name: string;
+  tag: string;
+  tagType: 'primary' | 'secondary' | 'neutral';
+  priceRange: string;
+  imageUrl?: string;
+  keyDifferentiator: string;
+}
+
+/**
+ * Stock availability by color
+ */
+export interface StockAvailability {
+  color: string;
+  colorCode: string;
+  waitingPeriod: string;
+}
+
+/**
+ * Good time to buy section
+ */
+export interface GoodTimeToBuySection {
+  overallSignal: string;
+  overallSignalType: 'positive' | 'negative' | 'neutral';
+  salesRank: {
+    label: string;
+    value: string;
+    description: string;
+  };
+  lifecycleCheck: {
+    label: string;
+    status: string;
+    statusType: 'positive' | 'negative' | 'neutral';
+    faceliftExpected: string;
+    generationYear: number;
+  };
+  timingSignal: {
+    label: string;
+    status: string;
+    statusType: 'positive' | 'negative' | 'neutral';
+    reason: string;
+  };
+  stockAvailability: StockAvailability[];
+  _placeholder?: boolean;
+}
+
+/**
+ * Praised or criticized item
+ */
+export interface OwnerSentimentItem {
+  text: string;
+  category: string;
+}
+
+/**
+ * Owner pulse section - aggregated owner sentiment
+ */
+export interface OwnerPulseSection {
+  rating: number;
+  totalReviews: number;
+  mostPraised: OwnerSentimentItem[];
+  mostCriticized: OwnerSentimentItem[];
+}
+
+/**
+ * Data source metadata
+ */
+export interface DataSourceMetadata {
+  corpus: string;
+  totalVideos: number;
+  totalComments: number;
+  sources: string[];
+  extractedAt: string;
+  lastUpdated: string;
+}
+
+/**
+ * Complete page content structure for a single vehicle
+ */
+export interface SingleVehiclePageContent {
+  vehicle: VehicleInfo;
+  quickDecision: QuickDecisionSection;
+  howMuchItReallyCosts: HowMuchItReallyCostsSection;
+  variantOptions: VariantOptionsSection;
+  segmentScorecard: SegmentScorecardSection;
+  mainCompetitors: MainCompetitor[];
+  goodTimeToBuy: GoodTimeToBuySection;
+  ownerPulse: OwnerPulseSection;
+  dataSource: DataSourceMetadata;
+}
+
+/**
+ * Generation progress for single vehicle content
+ */
+export interface SingleVehicleGenerationProgress {
+  step: string;
+  status: 'pending' | 'in-progress' | 'complete' | 'error';
+  message?: string;
+  duration?: number;
+}
+
+/**
+ * Single vehicle content generation result
+ */
+export interface SingleVehicleContentResult {
+  content: SingleVehiclePageContent;
+  metadata: {
+    generated_at: string;
+    processing_time_ms: number;
+    model_used: string;
+    steps_completed: number;
+  };
+}

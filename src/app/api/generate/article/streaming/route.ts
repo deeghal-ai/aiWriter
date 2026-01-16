@@ -30,7 +30,7 @@ const getArticlePlanningConfig = () => getModelApiConfig('article_planning');
 const getArticleCoherenceConfig = () => getModelApiConfig('article_coherence');
 
 // Helper to call Claude with streaming (required for Claude 4.5 models)
-// Includes retry logic for transient errors like "overloaded"
+// Includes retry logic for transient errors like "overloaded", connection resets, etc.
 async function callClaudeWithStreaming(
   client: Anthropic,
   model: string,
@@ -68,18 +68,27 @@ async function callClaudeWithStreaming(
     } catch (error: any) {
       lastError = error;
       const errorStr = String(error);
+      const errorCode = error?.cause?.cause?.code || error?.cause?.code || error?.code || '';
       
-      // Retry on transient errors (overloaded, rate limit, server errors)
+      // Retry on transient errors (overloaded, rate limit, server errors, connection issues)
       const isRetryable = 
         errorStr.includes('overloaded') || 
         errorStr.includes('rate_limit') ||
         errorStr.includes('529') ||
         errorStr.includes('500') ||
-        errorStr.includes('503');
+        errorStr.includes('503') ||
+        errorStr.includes('terminated') ||
+        errorStr.includes('ECONNRESET') ||
+        errorStr.includes('ETIMEDOUT') ||
+        errorStr.includes('ECONNREFUSED') ||
+        errorStr.includes('socket hang up') ||
+        errorCode === 'ECONNRESET' ||
+        errorCode === 'ETIMEDOUT' ||
+        errorCode === 'ECONNREFUSED';
       
       if (isRetryable && attempt < maxRetries) {
         const delay = Math.min(2000 * Math.pow(2, attempt - 1), 30000); // Exponential backoff, max 30s
-        console.log(`[Article] Retrying after ${delay}ms (attempt ${attempt}/${maxRetries})...`);
+        console.log(`[Article] Connection issue (${errorCode || errorStr.substring(0, 50)}), retrying after ${delay}ms (attempt ${attempt}/${maxRetries})...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -406,6 +415,60 @@ function cleanJsonResponse(text: string): string {
   return cleaned;
 }
 
+/**
+ * Repair common JSON issues from LLM output
+ * Handles: trailing commas, missing commas, etc.
+ */
+function repairJson(jsonText: string): string {
+  let repaired = jsonText;
+  
+  // Remove trailing commas before closing brackets/braces
+  repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+  
+  // Remove multiple consecutive commas
+  repaired = repaired.replace(/,(\s*),/g, ',');
+  
+  // Fix arrays/objects starting with comma
+  repaired = repaired.replace(/\[\s*,/g, '[');
+  repaired = repaired.replace(/\{\s*,/g, '{');
+  
+  // Fix missing commas after array elements that are objects
+  repaired = repaired.replace(/\}(\s*)\{/g, '},$1{');
+  
+  // Clean up any double commas we might have introduced
+  repaired = repaired.replace(/,\s*,/g, ',');
+  
+  // Final trailing comma cleanup
+  repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+  
+  return repaired;
+}
+
+/**
+ * Parse JSON with automatic repair on failure
+ */
+function parseJsonWithRepair(text: string, context: string): any {
+  const cleaned = cleanJsonResponse(text);
+  
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseError: any) {
+    console.warn(`[Article] JSON parse error in ${context}: ${parseError.message}`);
+    console.warn(`[Article] Attempting JSON repair...`);
+    
+    const repaired = repairJson(cleaned);
+    
+    try {
+      const result = JSON.parse(repaired);
+      console.log(`[Article] ✓ JSON repair successful for ${context}`);
+      return result;
+    } catch (repairError) {
+      console.error(`[Article] JSON repair failed for ${context}. Raw (first 500 chars):`, cleaned.substring(0, 500));
+      throw parseError;
+    }
+  }
+}
+
 async function generateNarrativePlan(
   client: Anthropic,
   bike1Name: string,
@@ -437,10 +500,8 @@ async function generateNarrativePlan(
     throw new Error('Unexpected empty response from AI');
   }
 
-  const cleanedJson = cleanJsonResponse(text);
-  
   try {
-    const parsed = JSON.parse(cleanedJson);
+    const parsed = parseJsonWithRepair(text, 'narrative plan');
     
     if (!parsed.story_angle || !parsed.hook_strategy || !parsed.matrix_focus_areas) {
       console.error('[Article] Invalid narrative plan structure:', parsed);
@@ -460,7 +521,7 @@ async function generateNarrativePlan(
       callbacks: parsed.callbacks || [],
     };
   } catch (error) {
-    console.error('[Article] Failed to parse narrative plan:', cleanedJson);
+    console.error('[Article] Failed to parse narrative plan');
     throw new Error(`Failed to parse narrative plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -558,12 +619,11 @@ async function runCoherencePass(
     throw new Error('Unexpected empty response from AI');
   }
 
-  const cleanedJson = cleanJsonResponse(text);
-  
   try {
-    return JSON.parse(cleanedJson);
+    return parseJsonWithRepair(text, 'coherence pass');
   } catch {
     // Return empty edits if parsing fails
+    console.warn('[Article] Coherence parsing failed, using empty edits');
     return {
       transitions_added: [],
       callbacks_added: [],

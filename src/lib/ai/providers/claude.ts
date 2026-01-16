@@ -28,6 +28,51 @@ import { BaseProvider } from "./base-provider";
 import type { AIProvider } from "../provider-interface";
 import type { InsightExtractionResult, PersonaGenerationResult, VerdictGenerationResult, Persona, BikeInsights, Verdict } from "../../types";
 
+/**
+ * Repair common JSON issues from LLM output
+ * Handles: trailing commas, missing commas, unescaped quotes, etc.
+ */
+function repairJson(jsonText: string): string {
+  let repaired = jsonText;
+  
+  // 1. Remove trailing commas before closing brackets/braces
+  // This is the most common issue: ,] or ,}
+  repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+  
+  // 2. Remove multiple consecutive commas
+  repaired = repaired.replace(/,(\s*),/g, ',');
+  
+  // 3. Fix arrays/objects starting with comma
+  repaired = repaired.replace(/\[\s*,/g, '[');
+  repaired = repaired.replace(/\{\s*,/g, '{');
+  
+  // 4. Remove trailing commas at end of file (before final } or ])
+  repaired = repaired.replace(/,(\s*)$/g, '$1');
+  
+  // 5. Handle potential "undefined" or "null" string literals that should be null
+  repaired = repaired.replace(/"undefined"/g, 'null');
+  
+  // 6. Remove any BOM or invisible characters
+  repaired = repaired.replace(/^\uFEFF/, '');
+  
+  // 7. Fix missing commas between array elements (common: "text""text" -> "text","text")
+  repaired = repaired.replace(/"\s*"/g, '","');
+  
+  // 8. Fix missing commas between object properties (}: followed by ")
+  repaired = repaired.replace(/}(\s*)"(?=[^:]*":)/g, '},$1"');
+  
+  // 9. Fix missing commas after array elements that are objects
+  repaired = repaired.replace(/\}(\s*)\{/g, '},$1{');
+  
+  // 10. Clean up any double commas we might have introduced
+  repaired = repaired.replace(/,\s*,/g, ',');
+  
+  // 11. Final trailing comma cleanup
+  repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+  
+  return repaired;
+}
+
 export class ClaudeProvider extends BaseProvider implements AIProvider {
   readonly name = "Claude (Anthropic)";
   readonly providerId = "anthropic";
@@ -184,18 +229,64 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
     // Remove markdown fences if present
     jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     
-    const insights = JSON.parse(jsonText);
+    // Try to parse JSON, with repair on failure
+    let insights;
+    try {
+      insights = JSON.parse(jsonText);
+    } catch (parseError: any) {
+      console.warn(`[Claude-Optimized] JSON parse error for ${bikeName}: ${parseError.message}`);
+      console.warn(`[Claude-Optimized] Attempting JSON repair...`);
+      
+      // Try to repair common JSON issues
+      const repairedJson = repairJson(jsonText);
+      
+      try {
+        insights = JSON.parse(repairedJson);
+        console.log(`[Claude-Optimized] ✓ JSON repair successful for ${bikeName}`);
+      } catch (repairError: any) {
+        // Log a portion of the raw response for debugging
+        console.error(`[Claude-Optimized] JSON repair failed. Raw response (first 500 chars):`, jsonText.substring(0, 500));
+        console.error(`[Claude-Optimized] Raw response (around error position ${parseError.message.match(/position (\d+)/)?.[1] || 'unknown'}):`, 
+          jsonText.substring(Math.max(0, parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') - 100), 
+                            parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') + 100));
+        throw new Error(`Failed to parse Claude response for ${bikeName}: ${parseError.message}`);
+      }
+    }
     
     // Normalize field names
     if (insights.bike_name && !insights.name) {
       insights.name = insights.bike_name;
       delete insights.bike_name;
     }
-    
+
     // Ensure arrays exist
     insights.praises = insights.praises || [];
     insights.complaints = insights.complaints || [];
     insights.surprising_insights = insights.surprising_insights || [];
+
+    // Ensure enhanced context fields exist (these are optional but useful for later stages)
+    if (!insights.contextual_summary) {
+      insights.contextual_summary = {
+        reviewer_consensus: '',
+        owner_consensus: '',
+        key_controversies: ''
+      };
+    }
+    if (!insights.real_world_observations) {
+      insights.real_world_observations = {
+        daily_use: [],
+        long_distance: [],
+        pillion_experience: [],
+        ownership_quirks: []
+      };
+    }
+    if (!insights.usage_patterns) {
+      insights.usage_patterns = {
+        primary_use_case: '',
+        typical_daily_distance: '',
+        common_modifications: []
+      };
+    }
     
     // Sanitize quotes
     insights.praises = insights.praises.map((p: any) => this.sanitizeCategory(p)).filter((p: any) => p.quotes && p.quotes.length > 0);
@@ -320,9 +411,25 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
         jsonText = jsonText.trim();
       }
       
-      console.log('[Claude] Raw parsed response:', JSON.stringify(JSON.parse(jsonText), null, 2).substring(0, 500));
+      // Try to parse JSON, with repair on failure
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch (parseError: any) {
+        console.warn(`[Claude] JSON parse error in verdicts: ${parseError.message}`);
+        const repairedJson = repairJson(jsonText);
+        try {
+          parsed = JSON.parse(repairedJson);
+          console.log(`[Claude] ✓ JSON repair successful for verdicts`);
+        } catch (repairError) {
+          console.error(`[Claude] JSON repair failed. Raw response (around error):`, 
+            jsonText.substring(Math.max(0, parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') - 100), 
+                              parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') + 100));
+          throw parseError;
+        }
+      }
       
-      const parsed = JSON.parse(jsonText);
+      console.log('[Claude] Raw parsed response:', JSON.stringify(parsed, null, 2).substring(0, 500));
       
       // Validate structure
       if (!parsed.verdicts || !Array.isArray(parsed.verdicts)) {
@@ -480,7 +587,6 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
       console.log(`[Claude] Verdict generation complete in ${processingTime}ms`);
       console.log(`[Claude] Generated ${parsed.verdicts.length} verdicts`);
       console.log(`[Claude] Summary: ${summary.bike1Wins} for ${bike1Name}, ${summary.bike2Wins} for ${bike2Name}`);
-      console.log(`[Claude] Usage: ${response.usage.input_tokens} input, ${response.usage.output_tokens} output tokens`);
       
       // Final check: log what we're returning
       console.log(`[Claude] Final verdicts check:`, parsed.verdicts.map((v: any) => ({
@@ -576,7 +682,23 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
       let jsonText = fullText.trim();
       jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       
-      const parsed = JSON.parse(jsonText);
+      // Try to parse JSON, with repair on failure
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch (parseError: any) {
+        console.warn(`[Claude-Optimized] JSON parse error in personas: ${parseError.message}`);
+        const repairedJson = repairJson(jsonText);
+        try {
+          parsed = JSON.parse(repairedJson);
+          console.log(`[Claude-Optimized] ✓ JSON repair successful for personas`);
+        } catch (repairError) {
+          console.error(`[Claude-Optimized] JSON repair failed. Raw response (around error):`, 
+            jsonText.substring(Math.max(0, parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') - 100), 
+                              parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') + 100));
+          throw parseError;
+        }
+      }
       
       // Validate structure
       if (!parsed.personas || !Array.isArray(parsed.personas)) {
@@ -758,7 +880,23 @@ export class ClaudeProvider extends BaseProvider implements AIProvider {
     let jsonText = fullText.trim();
     jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     
-    const verdict = JSON.parse(jsonText);
+    // Try to parse JSON, with repair on failure
+    let verdict;
+    try {
+      verdict = JSON.parse(jsonText);
+    } catch (parseError: any) {
+      console.warn(`[Claude-Optimized] JSON parse error for verdict (${persona.name}): ${parseError.message}`);
+      const repairedJson = repairJson(jsonText);
+      try {
+        verdict = JSON.parse(repairedJson);
+        console.log(`[Claude-Optimized] ✓ JSON repair successful for verdict (${persona.name})`);
+      } catch (repairError) {
+        console.error(`[Claude-Optimized] JSON repair failed. Raw response (around error):`, 
+          jsonText.substring(Math.max(0, parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') - 100), 
+                            parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') + 100));
+        throw parseError;
+      }
+    }
     
     // Normalize bike names to match input (Claude sometimes returns variations)
     const normalizeName = (name: string) => name.toLowerCase().trim();

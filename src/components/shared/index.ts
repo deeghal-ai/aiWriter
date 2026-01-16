@@ -1,0 +1,1 @@
+export { SharedContentView } from './SharedContentView';

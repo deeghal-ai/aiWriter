@@ -18,12 +18,12 @@ export function scoreComment(comment: { author: string; text: string; likeCount:
   const topics: string[] = [];
   let contentType: ScoredComment['contentType'] = 'other';
   
-  // Length scoring (10-200 chars is sweet spot)
+  // Length scoring (250-600 chars is sweet spot for substantive comments)
   const length = comment.text.length;
-  if (length >= 50 && length <= 500) score += 20;
-  else if (length >= 20 && length <= 1000) score += 10;
-  else if (length < 20) score -= 10;
-  else if (length > 1000) score += 5;  // Long but might be valuable
+  if (length >= 250 && length <= 600) score += 20;  // Ideal length
+  else if (length > 600 && length <= 1200) score += 15;  // Good, detailed
+  else if (length > 1200) score += 10;  // Very long, might have fluff
+  // Note: Comments < 250 are pre-filtered out before scoring
   
   // Like-based scoring (social proof)
   if (comment.likeCount >= 100) score += 30;
@@ -102,6 +102,21 @@ export function scoreComment(comment: { author: string; text: string; likeCount:
   };
 }
 
+// Minimum comment length - comments below this rarely contain substantive 
+// owner experiences or detailed opinions worth translating
+const MIN_COMMENT_LENGTH = 250;
+
+/**
+ * Pre-filter comments by length BEFORE expensive operations (translation, scoring)
+ * This saves processing time on comments that would be filtered anyway
+ */
+export function preFilterCommentsByLength(
+  comments: Array<{ author: string; text: string; likeCount: number }>,
+  minLength: number = MIN_COMMENT_LENGTH
+): Array<{ author: string; text: string; likeCount: number }> {
+  return comments.filter(c => c.text.length >= minLength);
+}
+
 /**
  * Filter and rank comments by quality
  */
@@ -112,17 +127,22 @@ export function filterAndRankComments(
     maxComments?: number;
     preferExperiences?: boolean;
     excludeSpam?: boolean;
+    minLength?: number;
   } = {}
 ): ScoredComment[] {
   const {
     minScore = 30,
     maxComments = 20,
     preferExperiences = true,
-    excludeSpam = true
+    excludeSpam = true,
+    minLength = MIN_COMMENT_LENGTH
   } = options;
   
-  // Score all comments
-  let scored = comments.map(scoreComment);
+  // Pre-filter by length FIRST (cheapest operation)
+  const lengthFiltered = comments.filter(c => c.text.length >= minLength);
+  
+  // Score remaining comments
+  let scored = lengthFiltered.map(scoreComment);
   
   // Filter spam
   if (excludeSpam) {

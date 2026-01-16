@@ -32,6 +32,113 @@ export function buildCondensedContext(
     keyQuotes: extractKeyQuotes(insights, 25), // Increased to capture more "voice"
     tensionPoints: identifyTensionPoints(insights, verdicts),
     hookData: extractHookData(insights, personas, verdicts),
+    proseContext: extractProseContext(insights, bike1Name, bike2Name),
+  };
+}
+
+/**
+ * Extract prose context from enhanced BikeInsights fields
+ * This provides rich narrative context for article generation
+ */
+function extractProseContext(
+  insights: InsightExtractionResult,
+  bike1Name: string,
+  bike2Name: string
+): ProseContext {
+  const bike1 = insights.bike1;
+  const bike2 = insights.bike2;
+
+  return {
+    bike1: extractBikeProseContext(bike1, bike1Name),
+    bike2: extractBikeProseContext(bike2, bike2Name),
+    headToHead: extractHeadToHeadContext(bike1, bike2, bike1Name, bike2Name),
+  };
+}
+
+/**
+ * Extract prose context for a single bike
+ */
+function extractBikeProseContext(bikeInsights: any, bikeName: string): BikeProseContext {
+  const contextSummary = bikeInsights?.contextual_summary || {};
+  const realWorld = bikeInsights?.real_world_observations || {};
+  const usage = bikeInsights?.usage_patterns || {};
+
+  return {
+    name: bikeName,
+    reviewerConsensus: contextSummary.reviewer_consensus || '',
+    ownerConsensus: contextSummary.owner_consensus || '',
+    keyControversies: contextSummary.key_controversies || '',
+    realWorldObservations: {
+      dailyUse: realWorld.daily_use || [],
+      longDistance: realWorld.long_distance || [],
+      pillionExperience: realWorld.pillion_experience || [],
+      ownershipQuirks: realWorld.ownership_quirks || [],
+    },
+    usagePatterns: {
+      primaryUseCase: usage.primary_use_case || '',
+      typicalDailyDistance: usage.typical_daily_distance || '',
+      commonModifications: usage.common_modifications || [],
+    },
+  };
+}
+
+/**
+ * Extract head-to-head comparison context from both bikes
+ * Uses comparison_context from extraction if available, otherwise infers from praises/complaints
+ */
+function extractHeadToHeadContext(
+  bike1: any,
+  bike2: any,
+  bike1Name: string,
+  bike2Name: string
+): ProseContext['headToHead'] {
+  // If comparison_context exists in the extraction, use it
+  const bike1Comparison = bike1?.comparison_context || {};
+  const bike2Comparison = bike2?.comparison_context || {};
+
+  let bike1Advantages = bike1Comparison.wins_against_competitor || [];
+  let bike2Advantages = bike2Comparison.wins_against_competitor || [];
+  let subjectivePreferences = [
+    ...(bike1Comparison.subjective_preferences || []),
+    ...(bike2Comparison.subjective_preferences || []),
+  ];
+
+  // If no explicit comparison context, infer from praises/complaints
+  if (bike1Advantages.length === 0 && bike2Advantages.length === 0) {
+    // Top praises for bike1 that are complaints for bike2 = advantages
+    const bike2ComplaintCategories: string[] = (bike2?.complaints || [])
+      .map((c: any) => c.category.toLowerCase());
+
+    // Find areas where bike1 is praised but bike2 is complained about
+    bike1Advantages = (bike1?.praises || [])
+      .filter((p: any) => {
+        const cat = p.category.toLowerCase();
+        return bike2ComplaintCategories.some((cc: string) =>
+          cat.includes(cc) || cc.includes(cat.split(' ')[0])
+        );
+      })
+      .slice(0, 3)
+      .map((p: any) => `${bike1Name} excels at ${p.category}`);
+
+    // Vice versa for bike2
+    const bike1ComplaintCategories: string[] = (bike1?.complaints || [])
+      .map((c: any) => c.category.toLowerCase());
+
+    bike2Advantages = (bike2?.praises || [])
+      .filter((p: any) => {
+        const cat = p.category.toLowerCase();
+        return bike1ComplaintCategories.some((cc: string) =>
+          cat.includes(cc) || cc.includes(cat.split(' ')[0])
+        );
+      })
+      .slice(0, 3)
+      .map((p: any) => `${bike2Name} excels at ${p.category}`);
+  }
+
+  return {
+    bike1Advantages,
+    bike2Advantages,
+    subjectivePreferences: [...new Set(subjectivePreferences)].slice(0, 4),
   };
 }
 
@@ -46,6 +153,45 @@ export interface CondensedArticleContext {
   keyQuotes: KeyQuote[];
   tensionPoints: TensionPoint[];
   hookData: HookData;
+  // Enhanced context for richer article generation (from extraction prose fields)
+  proseContext: ProseContext;
+}
+
+/**
+ * Enhanced prose context extracted from raw data
+ * This provides richer context for persona, verdict, and article stages
+ * Not displayed in Extract UI but passed to all subsequent stages
+ */
+interface ProseContext {
+  bike1: BikeProseContext;
+  bike2: BikeProseContext;
+  // Cross-bike comparison context
+  headToHead: {
+    bike1Advantages: string[];
+    bike2Advantages: string[];
+    subjectivePreferences: string[]; // "Some prefer X's thump, others find it tiring"
+  };
+}
+
+interface BikeProseContext {
+  name: string;
+  // Consensus summaries from reviewers and owners
+  reviewerConsensus: string;
+  ownerConsensus: string;
+  keyControversies: string;
+  // Real-world observations (high value for article writing)
+  realWorldObservations: {
+    dailyUse: string[];
+    longDistance: string[];
+    pillionExperience: string[];
+    ownershipQuirks: string[];
+  };
+  // Usage patterns
+  usagePatterns: {
+    primaryUseCase: string;
+    typicalDailyDistance: string;
+    commonModifications: string[];
+  };
 }
 
 interface CondensedInsights {
@@ -368,8 +514,11 @@ function extractHookData(
 
 /**
  * Serialize context for prompt injection (XML format)
+ * Enhanced with prose context for richer article generation
  */
 export function serializeContextForPrompt(ctx: CondensedArticleContext): string {
+  const prose = ctx.proseContext;
+
   return `<bikes>${ctx.bikes.bike1} vs ${ctx.bikes.bike2}</bikes>
 
 <insights>
@@ -383,6 +532,46 @@ ${ctx.bikes.bike2}:
   Weaknesses: ${ctx.insights.bike2.weaknesses.join(' | ')}
   Surprising: ${ctx.insights.bike2.surprising.join(' | ')}
 </insights>
+
+<reviewer_consensus>
+${ctx.bikes.bike1}: ${prose.bike1.reviewerConsensus || 'Not available'}
+${ctx.bikes.bike2}: ${prose.bike2.reviewerConsensus || 'Not available'}
+</reviewer_consensus>
+
+<owner_consensus>
+${ctx.bikes.bike1}: ${prose.bike1.ownerConsensus || 'Not available'}
+${ctx.bikes.bike2}: ${prose.bike2.ownerConsensus || 'Not available'}
+</owner_consensus>
+
+<key_controversies>
+${ctx.bikes.bike1}: ${prose.bike1.keyControversies || 'None noted'}
+${ctx.bikes.bike2}: ${prose.bike2.keyControversies || 'None noted'}
+</key_controversies>
+
+<real_world_observations>
+${ctx.bikes.bike1}:
+  Daily use: ${prose.bike1.realWorldObservations.dailyUse.slice(0, 3).join(' | ') || 'None'}
+  Long distance: ${prose.bike1.realWorldObservations.longDistance.slice(0, 2).join(' | ') || 'None'}
+  Pillion: ${prose.bike1.realWorldObservations.pillionExperience.slice(0, 2).join(' | ') || 'None'}
+  Ownership quirks: ${prose.bike1.realWorldObservations.ownershipQuirks.slice(0, 2).join(' | ') || 'None'}
+
+${ctx.bikes.bike2}:
+  Daily use: ${prose.bike2.realWorldObservations.dailyUse.slice(0, 3).join(' | ') || 'None'}
+  Long distance: ${prose.bike2.realWorldObservations.longDistance.slice(0, 2).join(' | ') || 'None'}
+  Pillion: ${prose.bike2.realWorldObservations.pillionExperience.slice(0, 2).join(' | ') || 'None'}
+  Ownership quirks: ${prose.bike2.realWorldObservations.ownershipQuirks.slice(0, 2).join(' | ') || 'None'}
+</real_world_observations>
+
+<usage_patterns>
+${ctx.bikes.bike1}: ${prose.bike1.usagePatterns.primaryUseCase || 'Unknown'} | Daily: ${prose.bike1.usagePatterns.typicalDailyDistance || 'Unknown'}
+${ctx.bikes.bike2}: ${prose.bike2.usagePatterns.primaryUseCase || 'Unknown'} | Daily: ${prose.bike2.usagePatterns.typicalDailyDistance || 'Unknown'}
+</usage_patterns>
+
+<head_to_head>
+${ctx.bikes.bike1} advantages: ${prose.headToHead.bike1Advantages.join(' | ') || 'None clear'}
+${ctx.bikes.bike2} advantages: ${prose.headToHead.bike2Advantages.join(' | ') || 'None clear'}
+Subjective: ${prose.headToHead.subjectivePreferences.join(' | ') || 'None noted'}
+</head_to_head>
 
 <personas>
 ${ctx.personas.map(p => `• ${p.name} (${p.title}): ${p.usage} | Priorities: ${p.topPriorities.join(', ')} | "${p.archetypeQuote}"`).join('\n')}

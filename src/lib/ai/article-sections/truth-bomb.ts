@@ -73,11 +73,12 @@ ${insights?.bike2?.name || 'Bike 2'}:
 </structure>
 
 <requirements>
-1. Word count: 100-150 words STRICT
+1. Word count: 80-120 words STRICT - be PUNCHY
 2. Lead with CONTRARIAN insight
 3. Must include evidence (quote or data)
 4. Must explain WHY it matters for buyers
 5. Must transition to "let's meet the riders..."
+6. DO NOT repeat general bike positioning from the hook
 </requirements>
 
 <tone>

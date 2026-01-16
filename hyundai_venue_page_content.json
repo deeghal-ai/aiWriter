@@ -1,0 +1,405 @@
+{
+  "vehicle": {
+    "make": "Hyundai",
+    "model": "Venue",
+    "year": 2025,
+    "segment": "Compact SUV"
+  },
+
+  "quickDecision": {
+    "priceRange": {
+      "min": "₹7.89L",
+      "max": "₹16.89L",
+      "minValue": 789000,
+      "maxValue": 1689000,
+      "priceType": "ex-showroom"
+    },
+    "idealFor": [
+      {
+        "label": "Driving Enthusiasts",
+        "icon": "steering-wheel"
+      },
+      {
+        "label": "Urban Commuters",
+        "icon": "city"
+      },
+      {
+        "label": "Tech Lovers",
+        "icon": "smartphone"
+      },
+      {
+        "label": "Small Families",
+        "icon": "family"
+      }
+    ],
+    "verdict": {
+      "headline": "Compact SUV that prioritizes driving fun and tech",
+      "summary": "The most engaging compact SUV to drive with a punchy turbo engine, sharp handling, and loaded features. 2025 update brings bigger cabin, premium interiors, and Level 2 ADAS.",
+      "highlightType": "positive"
+    },
+    "perfectIf": "You prioritize driving engagement, want multiple powertrain choices, and value Hyundai's connected car tech and service network",
+    "skipIf": "You need maximum rear seat space, want a panoramic sunroof, or prioritize fuel efficiency over performance",
+    "keyAdvantage": "120 HP turbo + 7-speed DCT + Dual 12.3\" screens + Level 2 ADAS at competitive pricing"
+  },
+
+  "howMuchItReallyCosts": {
+    "location": "Delhi NCR",
+    "locationDefault": true,
+    "selectedVariant": "SX(O) Turbo DCT",
+    "realOnRoadPrice": {
+      "amount": "₹14.85L",
+      "value": 1485000,
+      "breakdown": {
+        "exShowroom": 1299000,
+        "rto": 103920,
+        "insurance": 52000,
+        "accessories": 30000
+      }
+    },
+    "monthlyBurn": {
+      "emi": {
+        "amount": "₹26,800",
+        "value": 26800,
+        "loanAmount": 1200000,
+        "tenure": "60 months",
+        "interestRate": "9.5%"
+      },
+      "fuel": {
+        "amount": "₹6,200",
+        "value": 6200,
+        "assumedKmPerMonth": 1000,
+        "fuelEfficiency": "10 kmpl (city-highway mix)",
+        "fuelPrice": "₹103/L (petrol)"
+      },
+      "service": {
+        "amount": "₹1,100",
+        "value": 1100,
+        "basis": "Annual service cost averaged monthly"
+      }
+    },
+    "totalMonthly": {
+      "amount": "₹34,100",
+      "value": 34100
+    },
+    "savingsNote": {
+      "text": "Diesel saves ₹4K monthly vs Turbo Petrol on fuel",
+      "comparisonBasis": "1000 km/month"
+    },
+    "ctaLink": {
+      "text": "Explore full cost breakdown",
+      "url": "/hyundai/venue/cost-calculator"
+    }
+  },
+
+  "variantOptions": {
+    "fuelType": [
+      {
+        "label": "Petrol",
+        "value": "petrol",
+        "isDefault": true,
+        "variants": ["E", "S", "S+", "SX", "SX(O)"]
+      },
+      {
+        "label": "Turbo Petrol",
+        "value": "turbo-petrol",
+        "isDefault": false,
+        "variants": ["S+", "SX", "SX(O)", "N Line N6", "N Line N8", "N Line N10"]
+      },
+      {
+        "label": "Diesel",
+        "value": "diesel",
+        "isDefault": false,
+        "variants": ["S", "S+", "SX", "SX(O)"]
+      }
+    ],
+    "transmission": [
+      {
+        "label": "6-Speed Manual",
+        "value": "manual",
+        "availableWith": ["petrol", "turbo-petrol", "diesel"]
+      },
+      {
+        "label": "7-Speed DCT",
+        "value": "dct",
+        "availableWith": ["turbo-petrol"]
+      },
+      {
+        "label": "6-Speed AT",
+        "value": "automatic",
+        "availableWith": ["diesel"]
+      }
+    ],
+    "engineType": [
+      {
+        "label": "1.2L NA (4-Cyl)",
+        "value": "1.2l-na",
+        "power": "83 PS",
+        "torque": "114 Nm",
+        "fuelType": "petrol"
+      },
+      {
+        "label": "1.0L Turbo (3-Cyl)",
+        "value": "1.0l-turbo",
+        "power": "120 PS",
+        "torque": "172 Nm",
+        "fuelType": "turbo-petrol"
+      },
+      {
+        "label": "1.5L Diesel (4-Cyl)",
+        "value": "1.5l-diesel",
+        "power": "116 PS",
+        "torque": "250 Nm",
+        "fuelType": "diesel"
+      }
+    ],
+    "wheelTypes": [
+      {
+        "label": "16\" Steel",
+        "value": "16-steel",
+        "availableOn": ["E", "S"]
+      },
+      {
+        "label": "16\" Alloy",
+        "value": "16-alloy",
+        "availableOn": ["S+", "SX", "SX(O)"]
+      },
+      {
+        "label": "17\" Alloy",
+        "value": "17-alloy",
+        "availableOn": ["N Line N6", "N Line N8", "N Line N10"]
+      }
+    ],
+    "heroFeatures": [
+      {
+        "label": "Dual 12.3\" Screens",
+        "icon": "display",
+        "availableFrom": "S+"
+      },
+      {
+        "label": "Wireless Android Auto/CarPlay",
+        "icon": "wireless",
+        "availableFrom": "S+"
+      },
+      {
+        "label": "Level 2 ADAS",
+        "icon": "safety",
+        "availableFrom": "SX(O)"
+      },
+      {
+        "label": "Ventilated Seats",
+        "icon": "seat",
+        "availableFrom": "SX"
+      },
+      {
+        "label": "360° Camera",
+        "icon": "camera",
+        "availableFrom": "SX(O)"
+      },
+      {
+        "label": "Bose 8-Speaker Audio",
+        "icon": "speaker",
+        "availableFrom": "SX(O)"
+      }
+    ],
+    "cta": {
+      "text": "Explore Variants",
+      "url": "/hyundai/venue/variants"
+    }
+  },
+
+  "segmentScorecard": {
+    "leadingCount": 2,
+    "badge": "2 Leading",
+    "categories": [
+      {
+        "name": "Safety & Security",
+        "rank": "#3 of 6",
+        "rankNumber": 3,
+        "totalInSegment": 6,
+        "status": "Above Average",
+        "statusType": "neutral",
+        "highlights": ["Level 2 ADAS", "6 airbags", "All-wheel disc brakes"]
+      },
+      {
+        "name": "Fuel Efficiency",
+        "rank": "#4 of 6",
+        "rankNumber": 4,
+        "totalInSegment": 6,
+        "status": "Average",
+        "statusType": "neutral",
+        "highlights": ["Diesel: 23 kmpl", "Petrol NA: 17 kmpl", "Turbo: 8-12 kmpl"]
+      },
+      {
+        "name": "Value for Money",
+        "rank": "#2 of 6",
+        "rankNumber": 2,
+        "totalInSegment": 6,
+        "status": "Leads segment",
+        "statusType": "positive",
+        "highlights": ["Feature-loaded variants", "Hyundai service network", "Multiple powertrains"]
+      },
+      {
+        "name": "Style & Design",
+        "rank": "#2 of 6",
+        "rankNumber": 2,
+        "totalInSegment": 6,
+        "status": "Leads segment",
+        "statusType": "positive",
+        "highlights": ["Connected LED DRLs", "Dual 12.3\" screens", "Premium interior"]
+      },
+      {
+        "name": "Performance & Drive",
+        "rank": "#1 of 6",
+        "rankNumber": 1,
+        "totalInSegment": 6,
+        "status": "Best in class",
+        "statusType": "positive",
+        "highlights": ["120 HP turbo petrol", "7-speed DCT", "Engaging handling"]
+      }
+    ],
+    "summary": "Venue dominates driving dynamics with its punchy turbo petrol and precise handling. Strong value proposition with comprehensive feature list. Rear seat space and turbo fuel efficiency are acceptable trade-offs for driving enthusiasts."
+  },
+
+  "mainCompetitors": [
+    {
+      "name": "Maruti Brezza",
+      "tag": "Segment Leader",
+      "tagType": "primary",
+      "priceRange": "₹8.34-14.14L",
+      "imageUrl": "/assets/competitors/brezza.png",
+      "keyDifferentiator": "Best-in-class ride comfort"
+    },
+    {
+      "name": "Tata Nexon",
+      "tag": "Safety Champion",
+      "tagType": "secondary",
+      "priceRange": "₹8.10-15.50L",
+      "imageUrl": "/assets/competitors/nexon.png",
+      "keyDifferentiator": "5-star NCAP rating"
+    },
+    {
+      "name": "Kia Sonet",
+      "tag": "Feature Rich",
+      "tagType": "secondary",
+      "priceRange": "₹7.99-15.77L",
+      "imageUrl": "/assets/competitors/sonet.png",
+      "keyDifferentiator": "Ventilated seats, 360° camera"
+    },
+    {
+      "name": "Mahindra XUV 3XO",
+      "tag": "Tech Forward",
+      "tagType": "neutral",
+      "priceRange": "₹7.79-15.49L",
+      "imageUrl": "/assets/competitors/xuv3xo.png",
+      "keyDifferentiator": "Panoramic sunroof, AdrenoX"
+    }
+  ],
+
+  "goodTimeToBuy": {
+    "overallSignal": "Right Timing",
+    "overallSignalType": "positive",
+    "salesRank": {
+      "label": "Sales Rank",
+      "value": "Newly launched (Nov 2025)",
+      "description": "Fresh generation launch"
+    },
+    "lifecycleCheck": {
+      "label": "Lifecycle Check",
+      "status": "Fresh Launch",
+      "statusType": "positive",
+      "faceliftExpected": "Not expected before 2028",
+      "generationYear": 2025
+    },
+    "timingSignal": {
+      "label": "Timing Signal",
+      "status": "Safe to buy",
+      "statusType": "positive",
+      "reason": "Brand new model, no refresh expected soon"
+    },
+    "stockAvailability": [
+      {
+        "color": "Fiery Red",
+        "colorCode": "#B22222",
+        "waitingPeriod": "2-3 Weeks"
+      },
+      {
+        "color": "Titan Grey",
+        "colorCode": "#5A5A5A",
+        "waitingPeriod": "3-4 Weeks"
+      },
+      {
+        "color": "Hazel Blue",
+        "colorCode": "#4682B4",
+        "waitingPeriod": "4-5 Weeks"
+      },
+      {
+        "color": "Atlas White",
+        "colorCode": "#FFFFFF",
+        "waitingPeriod": "2-3 Weeks"
+      },
+      {
+        "color": "Abyss Black",
+        "colorCode": "#1C1C1C",
+        "waitingPeriod": "3-4 Weeks"
+      }
+    ]
+  },
+
+  "ownerPulse": {
+    "rating": 4.2,
+    "totalReviews": 742,
+    "mostPraised": [
+      {
+        "text": "Punchy turbo petrol engine",
+        "category": "performance"
+      },
+      {
+        "text": "Feature-rich for the price",
+        "category": "value"
+      },
+      {
+        "text": "Connected car tech (Blue Link)",
+        "category": "technology"
+      },
+      {
+        "text": "Nimble city driving",
+        "category": "drivability"
+      },
+      {
+        "text": "Multiple powertrain options",
+        "category": "variety"
+      }
+    ],
+    "mostCriticized": [
+      {
+        "text": "Turbo petrol fuel economy (8-9 kmpl city)",
+        "category": "efficiency"
+      },
+      {
+        "text": "Rear seat space for tall passengers",
+        "category": "space"
+      },
+      {
+        "text": "No panoramic sunroof option",
+        "category": "features"
+      },
+      {
+        "text": "Top variants pricing",
+        "category": "value"
+      },
+      {
+        "text": "Firm ride on bad roads",
+        "category": "comfort"
+      }
+    ]
+  },
+
+  "dataSource": {
+    "corpus": "hyundai_venue_corpus.json",
+    "totalVideos": 12,
+    "totalComments": 33,
+    "sources": ["YouTube"],
+    "extractedAt": "2026-01-15T09:49:08.952Z",
+    "lastUpdated": "2026-01-15"
+  }
+}

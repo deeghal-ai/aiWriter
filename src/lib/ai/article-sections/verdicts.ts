@@ -56,7 +56,7 @@ Persona Quote: "${persona?.archetypeQuote || ''}"
 
   return `<role>You're writing final verdicts. Each persona gets a clear, confident recommendation.</role>
 
-<task>Write 600-800 words with 150-200 words per persona, plus 50-word summary</task>
+<task>Write 400-500 words total with 100-120 words per persona, plus 40-word summary. Be CONCISE - cut fluff.</task>
 
 <verdict_data>
 ${verdictDescriptions}
@@ -71,7 +71,7 @@ Closest call: ${closestCall}
 <structure>
 ## The Verdicts
 
-For each persona (150-200 words):
+For each persona (100-120 words):
 
 ### For [Persona Name]: [Winning Bike] ([Confidence]%)
 
@@ -93,13 +93,13 @@ After all personas:
 </structure>
 
 <requirements>
-1. Total: 600-800 words
+1. Total: 400-500 words (100-120 per persona + 40-word summary) - BE CONCISE
 2. FIRST PERSON address: "For you, [Name]..." not "For [Name]..."
 3. Confidence percentage PROMINENTLY displayed
 4. Reference SPECIFIC priorities from persona data
-5. Include the tangible impact if available
-6. End each verdict with MEMORABLE closing line
-7. Final pattern section ties everything together
+5. End each verdict with ONE memorable closing line
+6. Final pattern section: 40 words MAX
+7. DO NOT re-describe personas - readers already know them from the Personas section
 </requirements>
 
 <tone>
@@ -122,6 +122,12 @@ Confident and direct. You're helping them decide, not hedging. No "it depends" e
 ❌ BAD pattern: "Both bikes have their place"
 ✅ GOOD pattern: "The pattern is clear: commute-heavy riders lean Honda, weekend-warriors lean RE. If your week looks like 80% traffic/20% fun, Honda. Flip it, and RE wins."
 </anti_patterns>
+
+<critical_constraint>
+DO NOT repeat persona backgrounds - readers already read the Personas section.
+DO NOT re-explain bike strengths covered in Matrix sections.
+Focus ONLY on the verdict and reasoning. Be surgical.
+</critical_constraint>
 
 <example_verdict>
 ### For Vikram: Honda CB350 (78%)

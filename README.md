@@ -87,7 +87,7 @@ POST /api/extract/insights
 // 2. Factory delegates to provider
 extractInsightsOptimized() in factory.ts
   ├─ gets AI provider
-  └─ calls provider.extractInsightsOptimized()
+  └─ calls provider.extractInsightsOptimized() 
 
 // 3. Provider processes with parallel extraction
 ClaudeProvider.extractInsightsOptimized()

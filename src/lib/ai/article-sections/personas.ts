@@ -53,7 +53,7 @@ Archetype Quote: "${p.archetypeQuote || 'I need the right bike for my life'}"
 
   return `<role>You're introducing rider personas. Each reader should finish thinking "That's me!" about one of them.</role>
 
-<task>Write 400-500 words introducing ${personasArray.length} personas (100-125 words each)</task>
+<task>Write 300-400 words introducing ${personasArray.length} personas (80-100 words each). Be PUNCHY - no padding.</task>
 
 <personas_data>
 ${personaDescriptions}
@@ -79,7 +79,7 @@ After all personas, close with:
 </writing_template>
 
 <requirements>
-1. Total: 400-500 words (100-125 per persona)
+1. Total: 300-400 words (80-100 per persona) - NO FLUFF
 2. Each persona gets:
    - Memorable one-line intro (NOT generic titles)
    - Riding life as STORY (specific routes, scenarios)

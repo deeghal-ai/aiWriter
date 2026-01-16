@@ -27,7 +27,7 @@ ${JSON.stringify(narrativePlan.callbacks, null, 2)}
 2. CALLBACKS: Ensure planned callbacks are present (references back to earlier points)
 3. CONSISTENCY: Flag any contradictions between sections
 4. FLOW: Smooth any abrupt tonal shifts
-5. WORD COUNT: Current total is ${totalWords}. Target is 3,500-4,500. Suggest cuts or additions.
+5. WORD COUNT: Current total is ${totalWords}. Target is 2,200-2,800 words. Suggest cuts for bloat/repetition or small additions only if under 2,200.
 </your_tasks>
 
 <output_format>

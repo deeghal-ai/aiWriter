@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { 
-  ArrowRight, 
-  ArrowLeft, 
-  RefreshCw, 
-  Loader2, 
+import {
+  ArrowRight,
+  ArrowLeft,
+  RefreshCw,
+  Loader2,
   CheckCircle2,
   AlertCircle,
   Zap,
@@ -19,7 +19,12 @@ import {
   Code,
   X,
   Copy,
-  Check
+  Check,
+  FileText,
+  MessageSquare,
+  Route,
+  Users,
+  Wrench
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { getModelOptions, getDefaultModel, type ModelOption } from '@/lib/ai/models/registry';
@@ -42,6 +47,7 @@ export function Step3Extract() {
   const [hasStarted, setHasStarted] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [showFullJson, setShowFullJson] = useState(false);
+  const [showProseContext, setShowProseContext] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   
   // Model selection - use registry to get default and available models
@@ -342,15 +348,26 @@ export function Step3Extract() {
                 <p className="text-xs text-slate-500">
                   Processed in {(extractedInsights.metadata.processing_time_ms / 1000).toFixed(1)}s
                 </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFullJson(true)}
-                  className="text-xs gap-1.5 text-slate-600 hover:text-slate-900"
-                >
-                  <Code className="h-3.5 w-3.5" />
-                  View Full JSON
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowProseContext(true)}
+                    className="text-xs gap-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    View Prose Context
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowFullJson(true)}
+                    className="text-xs gap-1.5 text-slate-600 hover:text-slate-900"
+                  >
+                    <Code className="h-3.5 w-3.5" />
+                    View Full JSON
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -511,71 +528,335 @@ export function Step3Extract() {
         </Button>
       </div>
       
-      {/* Full JSON Modal */}
+      {/* Full JSON Modal with Prose Context View */}
       {showFullJson && extractedInsights && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <div>
-                <h3 className="font-semibold text-lg">Full Insights JSON</h3>
-                <p className="text-sm text-slate-500">
-                  Complete extracted data structure
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyJson}
-                  className="gap-1.5"
-                >
-                  {jsonCopied ? (
-                    <>
-                      <Check className="h-4 w-4 text-green-600" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy JSON
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFullJson(false)}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Modal Body */}
-            <div className="flex-1 overflow-auto p-4">
-              <pre className="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg overflow-auto font-mono">
-                {JSON.stringify(extractedInsights, null, 2)}
-              </pre>
-            </div>
-            
-            {/* Modal Footer */}
-            <div className="p-4 border-t bg-slate-50 rounded-b-lg">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  {extractedInsights.bike1.praises.length + extractedInsights.bike2.praises.length} praise categories • 
-                  {extractedInsights.bike1.complaints.length + extractedInsights.bike2.complaints.length} complaint categories • 
-                  {extractedInsights.metadata.total_quotes} total quotes
-                </span>
-                <span>
-                  {(JSON.stringify(extractedInsights).length / 1024).toFixed(1)} KB
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FullInsightsModal
+          insights={extractedInsights}
+          onClose={() => setShowFullJson(false)}
+          onCopy={handleCopyJson}
+          jsonCopied={jsonCopied}
+          initialView="json"
+        />
+      )}
+      
+      {/* Prose Context Modal (direct access) */}
+      {showProseContext && extractedInsights && (
+        <FullInsightsModal
+          insights={extractedInsights}
+          onClose={() => setShowProseContext(false)}
+          onCopy={handleCopyJson}
+          jsonCopied={jsonCopied}
+          initialView="prose"
+        />
       )}
     </div>
+  );
+}
+
+/**
+ * Modal component to view full JSON and prose context
+ */
+function FullInsightsModal({
+  insights,
+  onClose,
+  onCopy,
+  jsonCopied,
+  initialView = 'prose'
+}: {
+  insights: InsightExtractionResult;
+  onClose: () => void;
+  onCopy: () => void;
+  jsonCopied: boolean;
+  initialView?: 'json' | 'prose';
+}) {
+  const [viewMode, setViewMode] = useState<'json' | 'prose'>(initialView);
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold text-lg">Extracted Insights</h3>
+          <div className="flex items-center gap-2">
+            {/* Toggle Buttons */}
+            <div className="flex rounded-lg border overflow-hidden">
+              <button
+                onClick={() => setViewMode('prose')}
+                className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
+                  viewMode === 'prose' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Prose Context
+              </button>
+              <button
+                onClick={() => setViewMode('json')}
+                className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
+                  viewMode === 'json' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Code className="h-3.5 w-3.5" />
+                Full JSON
+              </button>
+            </div>
+            
+            {viewMode === 'json' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onCopy}
+                className="gap-1.5"
+              >
+                {jsonCopied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-green-600" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            )}
+            
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-4">
+          {viewMode === 'json' ? (
+            <pre className="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg overflow-auto whitespace-pre-wrap">
+              {JSON.stringify(insights, null, 2)}
+            </pre>
+          ) : (
+            <ProseContextView insights={insights} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Component to display the prose context that gets passed to later stages
+ */
+function ProseContextView({ insights }: { insights: InsightExtractionResult }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <FileText className="h-4 w-4 text-blue-600" />
+          <h4 className="font-semibold text-blue-900">About Prose Context</h4>
+        </div>
+        <p className="text-sm text-blue-800">
+          This prose context is extracted from owner discussions and passed to the AI during persona generation and article writing. 
+          It provides rich, narrative context beyond the structured praises/complaints.
+        </p>
+      </div>
+      
+      {/* Bike 1 Context */}
+      <BikeProseCard bike={insights.bike1} />
+      
+      {/* Bike 2 Context */}
+      <BikeProseCard bike={insights.bike2} />
+    </div>
+  );
+}
+
+/**
+ * Card showing prose context for a single bike
+ */
+function BikeProseCard({ bike }: { bike: any }) {
+  const hasContextualSummary = bike.contextual_summary && (
+    bike.contextual_summary.reviewer_consensus ||
+    bike.contextual_summary.owner_consensus ||
+    bike.contextual_summary.key_controversies
+  );
+  
+  const hasRealWorld = bike.real_world_observations && (
+    bike.real_world_observations.daily_use?.length ||
+    bike.real_world_observations.long_distance?.length ||
+    bike.real_world_observations.pillion_experience?.length ||
+    bike.real_world_observations.ownership_quirks?.length
+  );
+  
+  const hasUsagePatterns = bike.usage_patterns && (
+    bike.usage_patterns.primary_use_case ||
+    bike.usage_patterns.typical_daily_distance ||
+    bike.usage_patterns.common_modifications?.length
+  );
+  
+  if (!hasContextualSummary && !hasRealWorld && !hasUsagePatterns) {
+    return (
+      <Card className="border-gray-200">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">{bike.name}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 italic">No prose context available for this bike.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">{bike.name}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Contextual Summary */}
+        {hasContextualSummary && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-purple-600" />
+              <h5 className="font-semibold text-purple-900">Contextual Summary</h5>
+            </div>
+            
+            {bike.contextual_summary.reviewer_consensus && (
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <p className="text-xs font-medium text-purple-700 mb-1">Reviewer Consensus</p>
+                <p className="text-sm text-gray-700">{bike.contextual_summary.reviewer_consensus}</p>
+              </div>
+            )}
+            
+            {bike.contextual_summary.owner_consensus && (
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <p className="text-xs font-medium text-purple-700 mb-1">Owner Consensus</p>
+                <p className="text-sm text-gray-700">{bike.contextual_summary.owner_consensus}</p>
+              </div>
+            )}
+            
+            {bike.contextual_summary.key_controversies && (
+              <div className="bg-amber-50 p-3 rounded-lg">
+                <p className="text-xs font-medium text-amber-700 mb-1">Key Controversies</p>
+                <p className="text-sm text-gray-700">{bike.contextual_summary.key_controversies}</p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Real World Observations */}
+        {hasRealWorld && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Route className="h-4 w-4 text-green-600" />
+              <h5 className="font-semibold text-green-900">Real World Observations</h5>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {bike.real_world_observations.daily_use?.length > 0 && (
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-xs font-medium text-green-700 mb-2">🏙️ Daily Use</p>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    {bike.real_world_observations.daily_use.map((obs: string, i: number) => (
+                      <li key={i} className="flex gap-1">
+                        <span className="text-green-600">•</span>
+                        {obs}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {bike.real_world_observations.long_distance?.length > 0 && (
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-xs font-medium text-green-700 mb-2">🛣️ Long Distance</p>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    {bike.real_world_observations.long_distance.map((obs: string, i: number) => (
+                      <li key={i} className="flex gap-1">
+                        <span className="text-green-600">•</span>
+                        {obs}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {bike.real_world_observations.pillion_experience?.length > 0 && (
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-xs font-medium text-green-700 mb-2">👥 Pillion Experience</p>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    {bike.real_world_observations.pillion_experience.map((obs: string, i: number) => (
+                      <li key={i} className="flex gap-1">
+                        <span className="text-green-600">•</span>
+                        {obs}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {bike.real_world_observations.ownership_quirks?.length > 0 && (
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-xs font-medium text-green-700 mb-2">🔧 Ownership Quirks</p>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    {bike.real_world_observations.ownership_quirks.map((obs: string, i: number) => (
+                      <li key={i} className="flex gap-1">
+                        <span className="text-green-600">•</span>
+                        {obs}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Usage Patterns */}
+        {hasUsagePatterns && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-600" />
+              <h5 className="font-semibold text-blue-900">Usage Patterns</h5>
+            </div>
+            
+            <div className="bg-blue-50 p-3 rounded-lg space-y-2">
+              {bike.usage_patterns.primary_use_case && (
+                <div>
+                  <p className="text-xs font-medium text-blue-700">Primary Use Case</p>
+                  <p className="text-sm text-gray-700">{bike.usage_patterns.primary_use_case}</p>
+                </div>
+              )}
+              
+              {bike.usage_patterns.typical_daily_distance && (
+                <div>
+                  <p className="text-xs font-medium text-blue-700">Typical Daily Distance</p>
+                  <p className="text-sm text-gray-700">{bike.usage_patterns.typical_daily_distance}</p>
+                </div>
+              )}
+              
+              {bike.usage_patterns.common_modifications?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-blue-700 mb-1">Common Modifications</p>
+                  <div className="flex flex-wrap gap-1">
+                    {bike.usage_patterns.common_modifications.map((mod: string, i: number) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        <Wrench className="h-3 w-3 mr-1" />
+                        {mod}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
