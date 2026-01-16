@@ -11,7 +11,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppStore, useSingleVehicleSaveStatus } from '@/lib/store';
 import { Loader2, AlertCircle, RefreshCw, Home, Search, Database, FileText, Cloud, CloudOff, Check } from 'lucide-react';
@@ -33,7 +33,18 @@ const SINGLE_STEPS = [
   { id: 5, name: 'Export', icon: Download, description: 'View & export' },
 ];
 
-export default function SingleVehiclePage() {
+// Loading component for Suspense fallback
+function PageLoading() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+      <p className="text-xs text-muted-foreground mt-3">Loading research...</p>
+    </div>
+  );
+}
+
+// Main content component that uses useSearchParams
+function SingleVehiclePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -306,5 +317,14 @@ export default function SingleVehiclePage() {
         </main>
       </div>
     </div>
+  );
+}
+
+// Default export wraps content in Suspense boundary for useSearchParams
+export default function SingleVehiclePage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <SingleVehiclePageContent />
+    </Suspense>
   );
 }
