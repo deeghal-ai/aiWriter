@@ -11,6 +11,12 @@ interface RouteParams {
   params: Promise<{ token: string }>;
 }
 
+interface SharedContent {
+  vehicle_name: string;
+  generated_content: Record<string, unknown> | null;
+  updated_at: string;
+}
+
 // GET /api/share/[token] - Fetch shared content
 export async function GET(
   request: NextRequest,
@@ -33,7 +39,7 @@ export async function GET(
       .from('single_vehicle_research')
       .select('vehicle_name, generated_content, updated_at')
       .eq('share_token', token)
-      .single();
+      .single() as { data: SharedContent | null; error: { code?: string; message?: string } | null };
     
     if (error || !data) {
       if (error?.code === 'PGRST116') {
