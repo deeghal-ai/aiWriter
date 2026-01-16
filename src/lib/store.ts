@@ -143,8 +143,8 @@ interface AppState {
   setSingleVehicleCurrentStep: (step: number) => void;
   markSingleVehicleStepComplete: (step: number) => void;
   setSingleVehicleScrapingProgress: (progress: SingleVehicleScrapingProgress[]) => void;
-  setSingleVehicleScrapedData: (source: 'youtube' | 'reddit' | 'internal', data: any) => void;
-  getSingleVehicleScrapedData: (source: 'youtube' | 'reddit' | 'internal') => any;
+  setSingleVehicleScrapedData: (source: 'youtube' | 'reddit' | 'internal' | 'webSearch', data: any) => void;
+  getSingleVehicleScrapedData: (source: 'youtube' | 'reddit' | 'internal' | 'webSearch') => any;
   setSingleVehicleCorpus: (corpus: SingleVehicleCorpus | null) => void;
   setSingleVehicleContent: (content: SingleVehiclePageContent | null) => void;
   setSingleVehicleGenerationProgress: (progress: SingleVehicleGenerationProgress[]) => void;
