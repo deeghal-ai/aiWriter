@@ -12,6 +12,13 @@ interface CreateShareRequest {
   researchId: string;
 }
 
+interface ResearchData {
+  id: string;
+  share_token: string | null;
+  generated_content: Record<string, unknown> | null;
+  vehicle_name: string;
+}
+
 /**
  * Generate a unique, URL-safe share token
  */
@@ -53,10 +60,10 @@ export async function POST(request: NextRequest) {
       .from('single_vehicle_research')
       .select('id, share_token, generated_content, vehicle_name')
       .eq('id', body.researchId)
-      .single();
+      .single() as { data: ResearchData | null; error: { code?: string; message?: string } | null };
     
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+    if (fetchError || !existing) {
+      if (fetchError?.code === 'PGRST116') {
         return NextResponse.json(
           { error: 'Research not found' },
           { status: 404 }
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('Error fetching research:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch research', details: fetchError.message },
+        { error: 'Failed to fetch research', details: fetchError?.message },
         { status: 500 }
       );
     }
