@@ -387,25 +387,25 @@ const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
     description: 'Extract insights from forum discussions'
   },
   personas: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.6,
     maxTokens: 6144,
     description: 'Generate detailed rider personas'
   },
   verdicts: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.6,
     maxTokens: 2048,
     description: 'Generate bike recommendations per persona'
   },
   article_planning: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.7,
     maxTokens: 4096,
     description: 'Plan article narrative structure'
   },
   article_writing: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.7,
     maxTokens: 4096,
     description: 'Write creative article sections'
@@ -424,31 +424,31 @@ const DEFAULT_TASK_CONFIG: Record<TaskType, TaskConfig> = {
   },
   // Single vehicle content generation tasks
   single_vehicle_owner_pulse: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.5,
     maxTokens: 2048,
     description: 'Extract owner sentiment patterns from corpus'
   },
   single_vehicle_quick_decision: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.6,
     maxTokens: 3072,
     description: 'Synthesize quick decision and verdict content'
   },
   single_vehicle_scorecard: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.5,
     maxTokens: 3072,
     description: 'Generate segment category rankings'
   },
   single_vehicle_competitors: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.4,
     maxTokens: 2048,
     description: 'Extract competitor mentions and analysis'
   },
   single_vehicle_timing: {
-    modelId: 'claude-opus-4.5',
+    modelId: 'claude-sonnet-4.5',
     temperature: 0.5,
     maxTokens: 2048,
     description: 'Analyze buy timing signals'
