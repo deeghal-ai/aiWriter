@@ -166,25 +166,27 @@ const KEY_ORDER: Record<string, string[]> = {
 /**
  * Reorder keys in an object according to the specified order
  */
-function reorderObjectKeys<T extends Record<string, unknown>>(obj: T, orderKey: string): T {
+function reorderObjectKeys<T extends object>(obj: T, orderKey: string): T {
   const keyOrder = KEY_ORDER[orderKey];
   if (!keyOrder || typeof obj !== 'object' || obj === null) {
     return obj;
   }
   
   const ordered = {} as T;
+  const objRecord = obj as Record<string, unknown>;
+  const orderedRecord = ordered as Record<string, unknown>;
   
   // Add keys in the specified order
   for (const key of keyOrder) {
-    if (key in obj) {
-      ordered[key as keyof T] = obj[key as keyof T];
+    if (key in objRecord) {
+      orderedRecord[key] = objRecord[key];
     }
   }
   
   // Add any remaining keys not in the order list
-  for (const key in obj) {
-    if (!(key in ordered)) {
-      ordered[key as keyof T] = obj[key as keyof T];
+  for (const key in objRecord) {
+    if (!(key in orderedRecord)) {
+      orderedRecord[key] = objRecord[key];
     }
   }
   
