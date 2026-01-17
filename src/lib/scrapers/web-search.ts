@@ -20,6 +20,7 @@ export interface SingleVehicleWebData {
   pricing: WebSearchResult;
   lifecycle: WebSearchResult;
   salesData: WebSearchResult;
+  competitors: WebSearchResult;
 }
 
 export interface WebSearchConfig {
@@ -40,6 +41,7 @@ function buildSearchQueries(vehicleName: string): Record<keyof SingleVehicleWebD
     pricing: `${vehicleName} on road price ex showroom delhi mumbai india ${year}`,
     lifecycle: `${vehicleName} facelift launch date next generation update india`,
     salesData: `${vehicleName} sales figures monthly india ${year} units sold`,
+    competitors: `${vehicleName} vs competitors alternatives comparison rivals india ${year}`,
   };
 }
 
@@ -200,6 +202,26 @@ function getMockSearchResults(query: string, vehicleName: string): WebSearchResu
         source: 'autocarindia.com',
       },
     ],
+    competitors: [
+      {
+        title: `${vehicleName} vs Rivals Comparison - CarDekho`,
+        url: 'https://www.cardekho.com/compare',
+        snippet: `${vehicleName} competes with Maruti Brezza, Tata Nexon, Kia Sonet, Hyundai Venue, and Mahindra XUV 3XO in the compact SUV segment. Key rivals offer similar pricing and features.`,
+        source: 'cardekho.com',
+      },
+      {
+        title: `Best Alternatives to ${vehicleName} - Carwale`,
+        url: 'https://www.carwale.com/alternatives',
+        snippet: `Top alternatives: 1. Tata Nexon (safety leader), 2. Maruti Brezza (segment bestseller), 3. Kia Sonet (feature-rich), 4. Hyundai Venue (turbo performance), 5. Mahindra XUV 3XO (value proposition).`,
+        source: 'carwale.com',
+      },
+      {
+        title: `${vehicleName} Comparison with Competitors - Zigwheels`,
+        url: 'https://www.zigwheels.com/compare',
+        snippet: `In the compact SUV segment, ${vehicleName} faces stiff competition from established rivals. The Nexon leads in safety ratings, Brezza in sales, and Sonet in features. ${vehicleName} offers balanced proposition.`,
+        source: 'zigwheels.com',
+      },
+    ],
   };
 
   // Determine which category this query belongs to
@@ -214,6 +236,8 @@ function getMockSearchResults(query: string, vehicleName: string): WebSearchResu
     return mockData.lifecycle;
   } else if (queryLower.includes('sales') || queryLower.includes('units')) {
     return mockData.salesData;
+  } else if (queryLower.includes('competitor') || queryLower.includes('alternative') || queryLower.includes('rival') || queryLower.includes(' vs ')) {
+    return mockData.competitors;
   }
 
   return mockData.specs;
@@ -297,12 +321,13 @@ export async function searchVehicleData(
   const queries = buildSearchQueries(vehicleName);
   
   // Execute all searches in parallel
-  const [specs, variants, pricing, lifecycle, salesData] = await Promise.all([
+  const [specs, variants, pricing, lifecycle, salesData, competitors] = await Promise.all([
     executeSearch(queries.specs, vehicleName, fullConfig),
     executeSearch(queries.variants, vehicleName, fullConfig),
     executeSearch(queries.pricing, vehicleName, fullConfig),
     executeSearch(queries.lifecycle, vehicleName, fullConfig),
     executeSearch(queries.salesData, vehicleName, fullConfig),
+    executeSearch(queries.competitors, vehicleName, fullConfig),
   ]);
 
   console.log(`[WebSearch] Completed all searches for ${vehicleName}`);
@@ -313,6 +338,7 @@ export async function searchVehicleData(
     pricing,
     lifecycle,
     salesData,
+    competitors,
   };
 }
 
@@ -328,6 +354,7 @@ export function formatWebSearchForAI(webData: SingleVehicleWebData): string {
     { key: 'pricing', title: 'Pricing Information' },
     { key: 'lifecycle', title: 'Lifecycle & Updates' },
     { key: 'salesData', title: 'Sales Data' },
+    { key: 'competitors', title: 'Competitors & Alternatives' },
   ];
 
   for (const section of sections) {

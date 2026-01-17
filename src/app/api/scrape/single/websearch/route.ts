@@ -78,10 +78,11 @@ export async function POST(request: NextRequest) {
       webData.variants.results.length +
       webData.pricing.results.length +
       webData.lifecycle.results.length +
-      webData.salesData.results.length;
+      webData.salesData.results.length +
+      webData.competitors.results.length;
 
     console.log(`[WebSearch] Completed search for ${vehicle}`);
-    console.log(`[WebSearch] Total results: ${totalResults} across 5 categories`);
+    console.log(`[WebSearch] Total results: ${totalResults} across 6 categories`);
 
     return NextResponse.json({
       success: true,
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
           pricing: webData.pricing.results.length,
           lifecycle: webData.lifecycle.results.length,
           salesData: webData.salesData.results.length,
+          competitors: webData.competitors.results.length,
         },
         isMockData: effectiveProvider === 'mock',
       }

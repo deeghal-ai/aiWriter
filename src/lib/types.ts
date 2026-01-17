@@ -483,6 +483,7 @@ export interface SingleVehicleWebData {
   pricing: WebSearchResult;
   lifecycle: WebSearchResult;
   salesData: WebSearchResult;
+  competitors: WebSearchResult;
 }
 
 /**
@@ -524,6 +525,15 @@ export interface SingleVehicleCorpus {
     totalPosts: number;
     totalComments: number;
     sourcesUsed: string[];
+    validation?: {
+      isValid: boolean;
+      confidence: number;
+      warnings: string[];
+      modelName: string;
+      videosWithTarget: number;
+      totalVideos: number;
+      unexpectedVehicles: Array<{ name: string; mentionCount: number }>;
+    };
   };
 }
 

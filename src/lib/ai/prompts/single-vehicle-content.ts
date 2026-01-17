@@ -353,86 +353,212 @@ Key principles:
  * Build prompt for competitor analysis extraction
  * UPDATED: Pass raw transcripts + web search to AI without pre-filtering
  */
+/**
+ * Segment-based competitor hints for Indian market
+ */
+const SEGMENT_COMPETITOR_HINTS: Record<string, string> = {
+  'Compact SUV': `Known Compact SUV competitors in India:
+- Maruti Brezza (segment bestseller)
+- Tata Nexon (safety leader, 5-star NCAP)
+- Kia Sonet (feature-rich)
+- Hyundai Venue (turbo performance)
+- Mahindra XUV 3XO (value proposition)
+- Nissan Magnite (aggressive pricing)
+- Renault Kiger (affordable turbo)
+- Toyota Urban Cruiser Taisor (reliability)`,
+
+  'Midsize SUV': `Known Midsize SUV competitors in India:
+- Hyundai Creta (segment leader)
+- Kia Seltos (feature-rich)
+- Maruti Grand Vitara (hybrid option)
+- Toyota Urban Cruiser Hyryder (hybrid)
+- Skoda Kushaq (driving dynamics)
+- VW Taigun (build quality)
+- MG Astor (AI features)
+- Honda Elevate (ride comfort)`,
+
+  'Compact Sedan': `Known Compact Sedan competitors in India:
+- Maruti Dzire (bestseller)
+- Hyundai Aura (features)
+- Tata Tigor (safety, EV option)
+- Honda Amaze (ride quality)`,
+
+  'Hatchback': `Known Hatchback competitors in India:
+- Maruti Swift (sporty)
+- Maruti Baleno (premium)
+- Hyundai i20 (features)
+- Tata Altroz (safety)
+- Toyota Glanza (reliability)
+- VW Polo (driving dynamics)`,
+
+  'Premium SUV': `Known Premium SUV competitors in India:
+- Mahindra XUV700 (value leader)
+- Tata Harrier (5-star safety)
+- Tata Safari (7-seater)
+- Hyundai Tucson (premium)
+- Jeep Compass (off-road)
+- MG Hector (features)`,
+};
+
 export function buildCompetitorAnalysisPrompt(corpus: SingleVehicleCorpus): string {
   const vehicleName = corpus.metadata?.vehicle || 'the vehicle';
+  const vehicleNameLower = vehicleName.toLowerCase();
   
-  // Get ALL transcripts (primary source - experts always mention competitors)
-  const transcripts = corpus.youtube?.videos?.filter(v => v.transcript)
-    .map(v => `[${v.channelTitle}] ${v.title}\n${v.transcript?.substring(0, 2000)}`)
-    .slice(0, 5) || [];
+  // PRIMARY SOURCE: Dedicated competitor search results (if available)
+  const competitorSearchResults = corpus.webSearch?.competitors?.results?.map(r => 
+    `[${r.source}] ${r.title}\n${r.snippet}`
+  ) || [];
   
-  // Video descriptions often explicitly list competitors
-  const descriptions = corpus.youtube?.videos?.map(v => 
-    `[${v.title}] ${v.description}`
-  ).slice(0, 5) || [];
+  // SECONDARY SOURCE: Video descriptions often explicitly mention rivals
+  // This is very reliable as reviewers list competitors in descriptions
+  const videoDescriptions = corpus.youtube?.videos?.filter(v => {
+    const desc = (v.description || '').toLowerCase();
+    return desc.includes('rival') || desc.includes('competitor') || desc.includes(' vs ') || 
+           desc.includes('take on') || desc.includes('competes') || desc.includes('alternative');
+  }).map(v => `[${v.channelTitle}] ${v.title}\n${v.description?.substring(0, 500)}`) || [];
   
-  // Web search results (specs pages often compare to competitors)
-  const webContext = [
-    ...(corpus.webSearch?.specs?.results?.map(r => r.snippet) || []),
-    ...(corpus.webSearch?.variants?.results?.map(r => r.snippet) || []),
-    ...(corpus.webSearch?.pricing?.results?.map(r => r.snippet) || [])
-  ].slice(0, 10);
+  // If no filtered descriptions, just take first 3 descriptions as they often mention competitors
+  const allDescriptions = videoDescriptions.length > 0 ? videoDescriptions : 
+    corpus.youtube?.videos?.slice(0, 5).map(v => `[${v.channelTitle}] ${v.title}\n${v.description?.substring(0, 400)}`) || [];
+  
+  // TERTIARY SOURCE: Sales data often lists segment rankings
+  const salesContext = corpus.webSearch?.salesData?.results?.map(r => r.snippet) || [];
+  
+  // QUATERNARY SOURCE: YouTube transcripts that mention comparisons
+  const transcripts = corpus.youtube?.videos?.filter(v => {
+    const text = (v.transcript || '' + v.title).toLowerCase();
+    return text.includes(' vs ') || text.includes('comparison') || text.includes('competes') || text.includes('rival');
+  })
+    .map(v => `[${v.channelTitle}] ${v.title}\n${v.transcript?.substring(0, 1500)}`)
+    .slice(0, 3) || [];
+  
+  // Detect segment from vehicle name itself first, then from web data
+  let segmentHint = '';
+  
+  // Direct vehicle name detection for known models
+  const knownCompactSedans = ['dzire', 'amaze', 'aura', 'tigor', 'aspire'];
+  const knownHatchbacks = ['swift', 'baleno', 'i20', 'i10', 'altroz', 'glanza', 'polo', 'tiago'];
+  const knownCompactSUVs = ['venue', 'brezza', 'nexon', 'sonet', 'xuv300', 'xuv 3xo', 'magnite', 'kiger', 'punch', 'fronx', 'exter'];
+  const knownMidsizeSUVs = ['creta', 'seltos', 'grand vitara', 'hyryder', 'kushaq', 'taigun', 'astor', 'elevate', 'curvv'];
+  
+  if (knownCompactSedans.some(s => vehicleNameLower.includes(s))) {
+    segmentHint = SEGMENT_COMPETITOR_HINTS['Compact Sedan'];
+  } else if (knownHatchbacks.some(s => vehicleNameLower.includes(s))) {
+    segmentHint = SEGMENT_COMPETITOR_HINTS['Hatchback'];
+  } else if (knownCompactSUVs.some(s => vehicleNameLower.includes(s))) {
+    segmentHint = SEGMENT_COMPETITOR_HINTS['Compact SUV'];
+  } else if (knownMidsizeSUVs.some(s => vehicleNameLower.includes(s))) {
+    segmentHint = SEGMENT_COMPETITOR_HINTS['Midsize SUV'];
+  }
+  
+  // Fallback: detect from web data if not detected from name
+  if (!segmentHint) {
+    const webText = [
+      ...(corpus.webSearch?.specs?.results?.map(r => r.snippet) || []),
+      ...(corpus.webSearch?.competitors?.results?.map(r => r.snippet) || [])
+    ].join(' ').toLowerCase();
+  
+    if (webText.includes('compact suv') || webText.includes('sub-4m suv') || webText.includes('sub 4m suv')) {
+      segmentHint = SEGMENT_COMPETITOR_HINTS['Compact SUV'];
+    } else if (webText.includes('midsize suv') || webText.includes('mid-size suv') || webText.includes('c-segment suv')) {
+      segmentHint = SEGMENT_COMPETITOR_HINTS['Midsize SUV'];
+    } else if (webText.includes('compact sedan') || webText.includes('sub-4m sedan') || webText.includes('entry sedan')) {
+      segmentHint = SEGMENT_COMPETITOR_HINTS['Compact Sedan'];
+    } else if (webText.includes('hatchback') || webText.includes('premium hatch')) {
+      segmentHint = SEGMENT_COMPETITOR_HINTS['Hatchback'];
+    } else if (webText.includes('premium suv') || webText.includes('full-size suv') || webText.includes('d-segment')) {
+      segmentHint = SEGMENT_COMPETITOR_HINTS['Premium SUV'];
+    }
+  }
   
   return `# Task: Extract Competitor Analysis for ${vehicleName}
 
-Analyze expert reviews and specifications to identify the main competitors.
+Identify the main competitors for ${vehicleName} based on the data sources below.
+
+IMPORTANT: ${vehicleName} is a compact sedan. Only extract OTHER compact sedans as competitors.
+Do NOT include SUVs (Nexon, Creta, Venue) or hatchbacks (Swift) as competitors - they are different segments.
+
+## PRIMARY SOURCE: Video Descriptions (Reviewers often list rivals here)
+
+<video_descriptions>
+${allDescriptions.length > 0 ? allDescriptions.join('\n\n---\n\n') : 'No video descriptions available.'}
+</video_descriptions>
+
+## Competitor Comparison Articles
+
+<competitor_search>
+${competitorSearchResults.length > 0 ? competitorSearchResults.join('\n\n---\n\n') : 'No dedicated competitor search results available.'}
+</competitor_search>
+
+## Sales & Segment Data
+
+<sales_context>
+${salesContext.length > 0 ? salesContext.join('\n\n') : 'No sales ranking data available.'}
+</sales_context>
 
 ## Expert Review Transcripts
 
 <transcripts>
-${transcripts.join('\n\n---\n\n')}
+${transcripts.length > 0 ? transcripts.join('\n\n---\n\n') : 'No comparison-focused transcripts available.'}
 </transcripts>
 
-## Video Descriptions
+${segmentHint ? `## Segment Context (MUST match this segment)
 
-<descriptions>
-${descriptions.join('\n\n')}
-</descriptions>
+${segmentHint}
 
-## Web Search Context
-
-<web_data>
-${webContext.join('\n\n')}
-</web_data>
-
+CRITICAL: Only extract competitors from this list that are ACTUALLY mentioned in the data above.
+Do NOT include vehicles from other segments even if mentioned in passing.
+` : ''}
 ## Instructions
 
-Look for competitor mentions in the data above. Experts typically mention competitors when:
-- Comparing specs: "...competes with the Brezza, Nexon, and Sonet"
-- Discussing positioning: "...rivals like the XUV300"
-- Making recommendations: "...if you're considering this vs the Magnite"
-- Noting alternatives: "...an alternative to the EcoSport"
+1. **FIRST check video descriptions** - reviewers typically list "rivals like X, Y, Z" explicitly
+2. Look for phrases like "takes on", "competes with", "rivals", "alternative to"
+3. Cross-reference with the segment context - only include vehicles from the SAME segment
+4. Do NOT include ${vehicleName} itself as a competitor
+5. Do NOT include vehicles from different segments (e.g., SUVs for a sedan)
 
 Extract 3-5 main competitors with:
 
-1. **name**: Full competitor name (e.g., "Maruti Brezza", "Tata Nexon")
-2. **tag**: Positioning based on how experts describe it
+1. **name**: Full competitor name (e.g., "Honda Amaze", "Hyundai Aura")
+2. **tag**: Positioning based on how the data describes it
    - "Segment Leader" - market leader / best seller
    - "Safety Champion" - known for safety ratings
    - "Feature Rich" - loaded with features
-   - "Value King" - best value proposition
+   - "Value King" - best value proposition  
    - "Tech Forward" - technology leader
    - "Comfort Focused" - ride/comfort specialist
+   - "Premium Choice" - upmarket positioning
+   - "Upcoming Challenger" - new/upcoming model
 3. **tagType**: primary (main rival), secondary (notable), neutral (mentioned)
 4. **priceRange**: Approximate price range if mentioned (e.g., "₹8-14L")
-5. **keyDifferentiator**: One key strength vs ${vehicleName} based on expert commentary
+5. **keyDifferentiator**: One key strength vs ${vehicleName} based on data
 
 ## Output Format
 
-Return valid JSON:
+Return valid JSON with exact key order:
 {
   "competitors": [
     {
-      "name": "Maruti Brezza",
-      "tag": "Segment Leader",
+      "name": "Honda Amaze",
+      "tag": "Comfort Focused",
       "tagType": "primary",
-      "priceRange": "₹8.34-14.14L",
-      "keyDifferentiator": "Best-in-class ride comfort"
+      "priceRange": "₹7-10L",
+      "keyDifferentiator": "Best-in-class ride quality in compact sedan segment"
+    },
+    {
+      "name": "Hyundai Aura",
+      "tag": "Feature Rich",
+      "tagType": "primary",
+      "priceRange": "₹6-9L",
+      "keyDifferentiator": "More features and modern design"
     }
   ]
 }
 
-Extract ONLY competitors actually mentioned in the data. If few competitors are mentioned, return fewer entries.`;
+IMPORTANT: 
+- Extract ONLY competitors explicitly mentioned in the data
+- ONLY include vehicles from the SAME segment (sedan competitors for sedan, SUV for SUV)
+- Quality over quantity - if only 2 competitors are clearly mentioned, return only 2`;
 }
 
 /**

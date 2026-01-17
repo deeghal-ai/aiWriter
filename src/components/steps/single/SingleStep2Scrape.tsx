@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowRight, ArrowLeft, Loader2, Check, AlertCircle, RefreshCw, Globe } from 'lucide-react';
 import { useAppStore, useAutoSaveSingleVehicle } from '@/lib/store';
 import type { SingleVehicleScrapingProgress, SingleVehicleCorpus } from '@/lib/types';
+import { validateCorpus } from '@/lib/scrapers/corpus-validator';
 
 export function SingleStep2Scrape() {
   const singleVehicle = useAppStore((state) => state.singleVehicle);
@@ -481,7 +482,8 @@ export function SingleStep2Scrape() {
       totalPosts += singleVehicleScrapedData.internal.reviews?.length || 0;
     }
     
-    const corpus: SingleVehicleCorpus = {
+    // Build preliminary corpus
+    const preliminaryCorpus: SingleVehicleCorpus = {
       youtube: singleVehicleScrapedData.youtube ? {
         vehicle: singleVehicle.vehicle,
         videos: singleVehicleScrapedData.youtube.videos || [],
@@ -506,6 +508,26 @@ export function SingleStep2Scrape() {
         totalPosts,
         totalComments,
         sourcesUsed
+      }
+    };
+    
+    // Run corpus validation to detect vehicle name mismatches
+    const validationResult = validateCorpus(singleVehicle.vehicle, preliminaryCorpus);
+    
+    // Add validation to corpus metadata
+    const corpus: SingleVehicleCorpus = {
+      ...preliminaryCorpus,
+      metadata: {
+        ...preliminaryCorpus.metadata,
+        validation: {
+          isValid: validationResult.isValid,
+          confidence: validationResult.confidence,
+          warnings: validationResult.warnings,
+          modelName: validationResult.details.modelName,
+          videosWithTarget: validationResult.details.videosWithTarget,
+          totalVideos: validationResult.details.totalVideos,
+          unexpectedVehicles: validationResult.details.unexpectedVehicles
+        }
       }
     };
     

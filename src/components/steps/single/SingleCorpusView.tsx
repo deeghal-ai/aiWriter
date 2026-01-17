@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, ArrowRight, Download, Copy, Check, ChevronDown, ChevronUp, 
   Youtube, MessageSquare, Database, FileText, ExternalLink,
-  Star, User, Clock, ThumbsUp, Sparkles, Globe, DollarSign, Car, Calendar, TrendingUp
+  Star, User, Clock, ThumbsUp, Sparkles, Globe, DollarSign, Car, Calendar, TrendingUp,
+  AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
@@ -100,6 +101,75 @@ export function SingleCorpusView() {
           Collected {metadata.totalPosts} items with {metadata.totalComments} comments from {metadata.sourcesUsed.length} sources
         </p>
       </div>
+      
+      {/* Validation Warnings */}
+      {metadata.validation && !metadata.validation.isValid && (
+        <Card className="mb-6 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-amber-100 shrink-0">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-amber-900 text-sm flex items-center gap-2">
+                  Possible Corpus Mismatch Detected
+                  <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 text-[10px]">
+                    {metadata.validation.confidence}% match
+                  </Badge>
+                </h4>
+                <ul className="mt-2 space-y-1">
+                  {metadata.validation.warnings.map((warning, i) => (
+                    <li key={i} className="text-xs text-amber-700 flex items-start gap-2">
+                      <span className="text-amber-500 mt-0.5">•</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+                {metadata.validation.unexpectedVehicles.length > 0 && (
+                  <div className="mt-3 p-2 bg-white/50 rounded border border-amber-200">
+                    <p className="text-[10px] text-amber-600 font-medium mb-1">Frequently mentioned vehicles:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {metadata.validation.unexpectedVehicles.slice(0, 3).map((v) => (
+                        <Badge key={v.name} variant="secondary" className="text-[10px] bg-amber-100 text-amber-800">
+                          {v.name} ({v.mentionCount}x)
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setSingleVehicleCurrentStep(2)}
+                    className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-100"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Re-scrape
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={handleGenerateContent}
+                    className="gap-1.5 text-amber-600"
+                  >
+                    Continue Anyway
+                    <ArrowRight className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Validation Success Badge (subtle) */}
+      {metadata.validation && metadata.validation.isValid && (
+        <div className="flex items-center gap-2 mb-4 text-emerald-600">
+          <Check className="w-4 h-4" />
+          <span className="text-xs">Corpus validation passed ({metadata.validation.confidence}% match for "{metadata.validation.modelName}")</span>
+        </div>
+      )}
       
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-3 mb-6">
