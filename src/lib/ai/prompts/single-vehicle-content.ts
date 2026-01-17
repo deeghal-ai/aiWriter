@@ -86,17 +86,17 @@ ${webSearchContext ? `\n## Web Search Specs Context\n\n${webSearchContext}` : ''
 
 ## Output Format
 
-Return valid JSON matching this structure:
+Return valid JSON with keys in this EXACT order:
 {
   "rating": 4.2,
   "totalReviews": 150,
   "mostPraised": [
     { "text": "Punchy turbo petrol engine", "category": "performance" },
-    ...
+    { "text": "Feature-rich for the price", "category": "value" }
   ],
   "mostCriticized": [
     { "text": "Turbo petrol fuel economy (8-9 kmpl city)", "category": "efficiency" },
-    ...
+    { "text": "Rear seat space for tall passengers", "category": "space" }
   ]
 }
 
@@ -217,7 +217,29 @@ Generate the following:
 
 ## Output Format
 
-Return valid JSON matching the quickDecision schema. Use REAL pricing from the data. Be specific and decisive.`;
+Return valid JSON with keys in this EXACT order:
+{
+  "priceRange": {
+    "min": "₹7.89L",
+    "max": "₹16.89L",
+    "minValue": 789000,
+    "maxValue": 1689000,
+    "priceType": "ex-showroom"
+  },
+  "idealFor": [
+    { "label": "Driving Enthusiasts", "icon": "steering-wheel" }
+  ],
+  "verdict": {
+    "headline": "Compact SUV that prioritizes driving fun",
+    "summary": "The most engaging compact SUV to drive...",
+    "highlightType": "positive"
+  },
+  "perfectIf": "You prioritize driving engagement...",
+  "skipIf": "You need maximum rear seat space...",
+  "keyAdvantage": "120 HP turbo + 7-speed DCT + Level 2 ADAS"
+}
+
+Use REAL pricing from the data. Be specific and decisive.`;
 }
 
 /**
@@ -243,11 +265,10 @@ export function buildSegmentScorecardPrompt(
 ): string {
   const vehicleName = corpus.metadata?.vehicle || 'the vehicle';
   
-  // Get comparison mentions from corpus
+  // Get comparison mentions from corpus (transcripts + descriptions only - no comments)
   const allText = [
     ...(corpus.youtube?.videos?.map(v => v.transcript || '') || []),
-    ...(corpus.youtube?.videos?.flatMap(v => v.comments?.map(c => c.text)) || []),
-    ...(corpus.reddit?.posts?.flatMap(p => [p.selftext, ...p.comments?.map(c => c.body) || []]) || [])
+    ...(corpus.youtube?.videos?.map(v => v.description || '') || [])
   ].join(' ').toLowerCase();
   
   // Detect mentioned competitors for context
@@ -284,21 +305,34 @@ Generate rankings for 5 categories:
 4. **Style & Design** - Exterior, interior, premium feel
 5. **Performance & Drive** - Power, handling, driving engagement
 
-For each category:
+For each category object, use these keys in order:
+- name: Category name (e.g., "Safety & Security")
 - rank: "#X of Y" format (assume 6 competitors in segment)
 - rankNumber: 1-6
+- totalInSegment: 6
 - status: "Best in class" / "Leads segment" / "Above Average" / "Average" / "Below Average"
 - statusType: positive (rank 1-2) / neutral (rank 3-4) / negative (rank 5-6)
 - highlights: 2-3 specific points supporting the rank
 
-Also provide:
-- leadingCount: How many categories is this vehicle #1 or #2 in
-- badge: Summary (e.g., "2 Leading", "Segment Leader", "Strong Contender")
-- summary: 2-3 sentence positioning statement
-
 ## Output Format
 
-Return valid JSON matching the segmentScorecard schema.`;
+Return valid JSON with keys in this EXACT order:
+{
+  "leadingCount": 2,
+  "badge": "2 Leading",
+  "categories": [
+    {
+      "name": "Safety & Security",
+      "rank": "#1 of 6",
+      "rankNumber": 1,
+      "totalInSegment": 6,
+      "status": "Best in class",
+      "statusType": "positive",
+      "highlights": ["Level 2 ADAS", "6 airbags", "All-wheel disc brakes"]
+    }
+  ],
+  "summary": "Vehicle positioning statement here..."
+}`;
 }
 
 /**
@@ -317,54 +351,71 @@ Key principles:
 
 /**
  * Build prompt for competitor analysis extraction
+ * UPDATED: Pass raw transcripts + web search to AI without pre-filtering
  */
 export function buildCompetitorAnalysisPrompt(corpus: SingleVehicleCorpus): string {
   const vehicleName = corpus.metadata?.vehicle || 'the vehicle';
   
-  // Collect all text mentioning comparisons
-  const comparisonTexts = [
-    ...(corpus.youtube?.videos?.filter(v => 
-      v.title.toLowerCase().includes('vs') || 
-      v.title.toLowerCase().includes('compare') ||
-      v.description.toLowerCase().includes('competitor')
-    ).map(v => `${v.title}: ${v.description}`) || []),
-    ...(corpus.youtube?.videos?.flatMap(v => 
-      v.comments?.filter(c => 
-        c.text.toLowerCase().includes('better than') ||
-        c.text.toLowerCase().includes('compared to') ||
-        c.text.toLowerCase().includes('vs')
-      ).map(c => c.text)
-    ) || []),
-    ...(corpus.reddit?.posts?.filter(p =>
-      p.title.toLowerCase().includes('vs') ||
-      p.selftext.toLowerCase().includes('compare')
-    ).map(p => `${p.title}: ${p.selftext}`) || [])
-  ];
+  // Get ALL transcripts (primary source - experts always mention competitors)
+  const transcripts = corpus.youtube?.videos?.filter(v => v.transcript)
+    .map(v => `[${v.channelTitle}] ${v.title}\n${v.transcript?.substring(0, 2000)}`)
+    .slice(0, 5) || [];
+  
+  // Video descriptions often explicitly list competitors
+  const descriptions = corpus.youtube?.videos?.map(v => 
+    `[${v.title}] ${v.description}`
+  ).slice(0, 5) || [];
+  
+  // Web search results (specs pages often compare to competitors)
+  const webContext = [
+    ...(corpus.webSearch?.specs?.results?.map(r => r.snippet) || []),
+    ...(corpus.webSearch?.variants?.results?.map(r => r.snippet) || []),
+    ...(corpus.webSearch?.pricing?.results?.map(r => r.snippet) || [])
+  ].slice(0, 10);
   
   return `# Task: Extract Competitor Analysis for ${vehicleName}
 
-Identify competitors mentioned in owner discussions and their positioning.
+Analyze expert reviews and specifications to identify the main competitors.
 
-## Comparison Mentions
+## Expert Review Transcripts
 
-<comparison_data>
-${comparisonTexts.slice(0, 50).join('\n\n')}
-</comparison_data>
+<transcripts>
+${transcripts.join('\n\n---\n\n')}
+</transcripts>
+
+## Video Descriptions
+
+<descriptions>
+${descriptions.join('\n\n')}
+</descriptions>
+
+## Web Search Context
+
+<web_data>
+${webContext.join('\n\n')}
+</web_data>
 
 ## Instructions
 
+Look for competitor mentions in the data above. Experts typically mention competitors when:
+- Comparing specs: "...competes with the Brezza, Nexon, and Sonet"
+- Discussing positioning: "...rivals like the XUV300"
+- Making recommendations: "...if you're considering this vs the Magnite"
+- Noting alternatives: "...an alternative to the EcoSport"
+
 Extract 3-5 main competitors with:
 
-1. **name**: Full competitor name (e.g., "Maruti Brezza")
-2. **tag**: Positioning tag based on discussions
-   - "Segment Leader" - market leader
-   - "Safety Champion" - known for safety
+1. **name**: Full competitor name (e.g., "Maruti Brezza", "Tata Nexon")
+2. **tag**: Positioning based on how experts describe it
+   - "Segment Leader" - market leader / best seller
+   - "Safety Champion" - known for safety ratings
    - "Feature Rich" - loaded with features
-   - "Value King" - best value
+   - "Value King" - best value proposition
    - "Tech Forward" - technology leader
+   - "Comfort Focused" - ride/comfort specialist
 3. **tagType**: primary (main rival), secondary (notable), neutral (mentioned)
-4. **priceRange**: Approximate price range (e.g., "₹8-14L")
-5. **keyDifferentiator**: One key strength vs ${vehicleName}
+4. **priceRange**: Approximate price range if mentioned (e.g., "₹8-14L")
+5. **keyDifferentiator**: One key strength vs ${vehicleName} based on expert commentary
 
 ## Output Format
 
@@ -377,12 +428,11 @@ Return valid JSON:
       "tagType": "primary",
       "priceRange": "₹8.34-14.14L",
       "keyDifferentiator": "Best-in-class ride comfort"
-    },
-    ...
+    }
   ]
 }
 
-Extract only competitors actually mentioned in the data.`;
+Extract ONLY competitors actually mentioned in the data. If few competitors are mentioned, return fewer entries.`;
 }
 
 /**
@@ -650,7 +700,26 @@ Extract and structure:
 
 ## Output Format
 
-Return valid JSON matching the variantOptions schema. Extract REAL data only.`;
+Return valid JSON with keys in this EXACT order:
+{
+  "fuelType": [
+    { "label": "Petrol", "value": "petrol", "isDefault": true, "variants": ["E", "S", "S+"] }
+  ],
+  "transmission": [
+    { "label": "6-Speed Manual", "value": "manual", "availableWith": ["petrol", "diesel"] }
+  ],
+  "engineType": [
+    { "label": "1.0L Turbo (3-Cyl)", "value": "1.0l-turbo", "power": "120 PS", "torque": "172 Nm", "fuelType": "turbo-petrol" }
+  ],
+  "wheelTypes": [
+    { "label": "16\\" Alloy", "value": "16-alloy", "availableOn": ["S+", "SX"] }
+  ],
+  "heroFeatures": [
+    { "label": "Dual 12.3\\" Screens", "icon": "display", "availableFrom": "S+" }
+  ]
+}
+
+Extract REAL data only.`;
 }
 
 /**
@@ -729,7 +798,31 @@ Extract and calculate:
 
 ## Output Format
 
-Return valid JSON matching the howMuchItReallyCosts schema. Use REAL pricing data.`;
+Return valid JSON with keys in this EXACT order:
+{
+  "location": "Delhi NCR",
+  "locationDefault": true,
+  "selectedVariant": "SX(O) Turbo DCT",
+  "realOnRoadPrice": {
+    "amount": "₹14.85L",
+    "value": 1485000,
+    "breakdown": {
+      "exShowroom": 1299000,
+      "rto": 103920,
+      "insurance": 52000,
+      "accessories": 30000
+    }
+  },
+  "monthlyBurn": {
+    "emi": { "amount": "₹26,800", "value": 26800, "loanAmount": 1200000, "tenure": "60 months", "interestRate": "9.5%" },
+    "fuel": { "amount": "₹6,200", "value": 6200, "assumedKmPerMonth": 1000, "fuelEfficiency": "10 kmpl", "fuelPrice": "₹103/L" },
+    "service": { "amount": "₹1,100", "value": 1100, "basis": "Annual service cost averaged monthly" }
+  },
+  "totalMonthly": { "amount": "₹34,100", "value": 34100 },
+  "savingsNote": { "text": "Diesel saves ₹4K monthly", "comparisonBasis": "1000 km/month" }
+}
+
+Use REAL pricing data from web search.`;
 }
 
 /**
@@ -818,5 +911,32 @@ Analyze and generate:
 
 ## Output Format
 
-Return valid JSON matching the goodTimeToBuy schema. Use REAL data from web search.`;
+Return valid JSON with keys in this EXACT order:
+{
+  "overallSignal": "Right Timing",
+  "overallSignalType": "positive",
+  "salesRank": {
+    "label": "Sales Rank",
+    "value": "#4 in segment",
+    "description": "8,500 units/month"
+  },
+  "lifecycleCheck": {
+    "label": "Lifecycle Check",
+    "status": "Fresh Launch",
+    "statusType": "positive",
+    "faceliftExpected": "Not expected before 2028",
+    "generationYear": 2025
+  },
+  "timingSignal": {
+    "label": "Timing Signal",
+    "status": "Safe to buy",
+    "statusType": "positive",
+    "reason": "Brand new model, no refresh expected soon"
+  },
+  "stockAvailability": [
+    { "color": "White", "colorCode": "#FFFFFF", "waitingPeriod": "2-3 Weeks" }
+  ]
+}
+
+Use REAL data from web search.`;
 }

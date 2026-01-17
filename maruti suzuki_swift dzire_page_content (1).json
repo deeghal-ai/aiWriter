@@ -1,0 +1,413 @@
+{
+  "vehicle": {
+    "make": "Maruti Suzuki",
+    "year": 2025,
+    "model": "Swift Dzire",
+    "segment": "Sedan"
+  },
+  "dataSource": {
+    "corpus": "maruti_swift_dzire_corpus.json",
+    "sources": [
+      "YouTube",
+      "WebSearch",
+      "WebSearch"
+    ],
+    "extractedAt": "2026-01-16T05:23:50.454Z",
+    "lastUpdated": "2026-01-16",
+    "totalVideos": 12,
+    "totalComments": 30
+  },
+  "ownerPulse": {
+    "rating": 4.1,
+    "mostPraised": [
+      {
+        "text": "Exceptional fuel efficiency (25+ kmpl highway)",
+        "category": "efficiency"
+      },
+      {
+        "text": "Best-looking Dzire design ever, sharp angular styling",
+        "category": "design"
+      },
+      {
+        "text": "5-star Global NCAP safety rating with 6 airbags",
+        "category": "safety"
+      },
+      {
+        "text": "Feature-rich: 360° camera, sunroof, wireless charger",
+        "category": "features"
+      },
+      {
+        "text": "Purpose-built sedan, not just Swift with boot",
+        "category": "design"
+      },
+      {
+        "text": "Affordable pricing starting at ₹6.79 lakh",
+        "category": "value"
+      }
+    ],
+    "totalReviews": 23,
+    "mostCriticized": [
+      {
+        "text": "Average plastic quality, lacks premium feel inside",
+        "category": "build-quality"
+      },
+      {
+        "text": "Light-colored fabric seats stain quickly",
+        "category": "comfort"
+      },
+      {
+        "text": "No central armrest, causes fatigue on long drives",
+        "category": "comfort"
+      },
+      {
+        "text": "3-cylinder engine feels sluggish vs old 4-cylinder",
+        "category": "performance"
+      },
+      {
+        "text": "Smallest boot in segment at 382L vs rivals 400L+",
+        "category": "space"
+      },
+      {
+        "text": "Tight rear headroom for taller passengers",
+        "category": "space"
+      }
+    ]
+  },
+  "goodTimeToBuy": {
+    "salesRank": {
+      "label": "Sales Rank",
+      "value": "#1 Best-Seller in India",
+      "description": "India's best-selling car in 2025 with 2.14 lakh units sold. November 2025 saw 21,082 units with 79% YoY growth."
+    },
+    "timingSignal": {
+      "label": "Timing Signal",
+      "reason": "Fourth-generation model just launched in November 2024 with fresh design, new features including 360-degree camera, sunroof, and LED lighting - you'll get the latest technology for years to come.",
+      "status": "Safe to buy",
+      "statusType": "positive"
+    },
+    "overallSignal": "Right Timing",
+    "lifecycleCheck": {
+      "label": "Lifecycle Check",
+      "status": "Fresh Launch",
+      "statusType": "positive",
+      "generationYear": 2024,
+      "faceliftExpected": "Not expected before 2027-2028"
+    },
+    "overallSignalType": "positive",
+    "stockAvailability": [
+      {
+        "color": "Arctic White",
+        "waitingPeriod": "3-4 weeks"
+      },
+      {
+        "color": "Magma Grey",
+        "waitingPeriod": "2-3 weeks"
+      },
+      {
+        "color": "Sherwood Brown",
+        "waitingPeriod": "2-3 weeks"
+      },
+      {
+        "color": "Alluring Blue",
+        "waitingPeriod": "3-4 weeks"
+      },
+      {
+        "color": "Gallant Red",
+        "waitingPeriod": "2-3 weeks"
+      },
+      {
+        "color": "Bluish Black",
+        "waitingPeriod": "4-5 weeks"
+      }
+    ]
+  },
+  "quickDecision": {
+    "skipIf": "You need punchy acceleration, premium cabin materials, a spacious boot, or rear headroom for 6-footers",
+    "verdict": {
+      "summary": "The 2024 Dzire breaks free from its 'Swift-with-a-boot' legacy with stunning purpose-built design, 5-star safety, and class-leading 25+ kmpl efficiency. The 3-cylinder engine and basic interior plastics are compromises, but at this price with these features, it's hard to argue.",
+      "headline": "Finally, a Dzire worth desiring",
+      "highlightType": "positive"
+    },
+    "idealFor": [
+      {
+        "icon": "value",
+        "label": "Fuel-conscious commuters"
+      },
+      {
+        "icon": "steering-wheel",
+        "label": "First-time sedan buyers"
+      },
+      {
+        "icon": "safety",
+        "label": "Safety-first families"
+      },
+      {
+        "icon": "city",
+        "label": "City daily drivers"
+      },
+      {
+        "icon": "smartphone",
+        "label": "Style-seekers on budget"
+      }
+    ],
+    "perfectIf": "You want the best-looking compact sedan under ₹11L with 5-star safety, 25+ kmpl mileage, and don't need rear-seat luxury or spirited performance",
+    "priceRange": {
+      "max": "₹10.89L",
+      "min": "₹6.79L",
+      "maxValue": 1089000,
+      "minValue": 679000,
+      "priceType": "ex-showroom"
+    },
+    "keyAdvantage": "5-star NCAP + 6 airbags + 25.71 kmpl + 360° camera + sunroof from ₹6.79L"
+  },
+  "variantOptions": {
+    "fuelType": [
+      {
+        "label": "Petrol",
+        "value": "petrol",
+        "variants": [
+          "LXI",
+          "VXI",
+          "VXI AMT",
+          "ZXI",
+          "ZXI Plus",
+          "ZXI Plus AMT"
+        ],
+        "isDefault": true
+      },
+      {
+        "label": "CNG",
+        "value": "cng",
+        "variants": [
+          "VXI CNG",
+          "ZXI CNG"
+        ],
+        "isDefault": false
+      }
+    ],
+    "engineType": [
+      {
+        "label": "1.2L Z-Series (3-Cyl)",
+        "power": "80 bhp @ 5700 rpm",
+        "value": "1.2l-z-series",
+        "torque": "111.7 Nm @ 4300 rpm",
+        "fuelType": "petrol"
+      },
+      {
+        "label": "1.2L Z-Series CNG (3-Cyl)",
+        "power": "69 bhp",
+        "value": "1.2l-z-series-cng",
+        "torque": "101.8 Nm",
+        "fuelType": "cng"
+      }
+    ],
+    "wheelTypes": [
+      {
+        "label": "Steel Wheels with Covers",
+        "value": "steel-wheels",
+        "availableOn": [
+          "LXI",
+          "VXI",
+          "VXI AMT"
+        ]
+      },
+      {
+        "label": "Alloy Wheels",
+        "value": "alloy-wheels",
+        "availableOn": [
+          "ZXI",
+          "ZXI Plus",
+          "ZXI Plus AMT"
+        ]
+      }
+    ],
+    "heroFeatures": [
+      {
+        "icon": "display",
+        "label": "Electric Sunroof",
+        "availableFrom": "ZXI Plus"
+      },
+      {
+        "icon": "display",
+        "label": "Touchscreen Infotainment",
+        "availableFrom": "VXI"
+      },
+      {
+        "icon": "display",
+        "label": "Automatic Climate Control",
+        "availableFrom": "ZXI"
+      },
+      {
+        "icon": "safety",
+        "label": "Dual Airbags",
+        "availableFrom": "LXI"
+      },
+      {
+        "icon": "camera",
+        "label": "Rear Parking Camera",
+        "availableFrom": "ZXI"
+      },
+      {
+        "icon": "wireless",
+        "label": "Wireless Charger",
+        "availableFrom": "ZXI Plus"
+      }
+    ],
+    "transmission": [
+      {
+        "label": "5-Speed Manual",
+        "value": "manual",
+        "availableWith": [
+          "petrol",
+          "cng"
+        ]
+      },
+      {
+        "label": "AMT (Auto Gear Shift)",
+        "value": "amt",
+        "availableWith": [
+          "petrol"
+        ]
+      }
+    ]
+  },
+  "mainCompetitors": [
+    {
+      "tag": "Segment Leader",
+      "name": "Maruti Swift",
+      "tagType": "primary",
+      "priceRange": "₹6.49-9.64L",
+      "keyDifferentiator": "Sportier hatchback sibling sharing platform and engine, appeals to those preferring compact form factor"
+    },
+    {
+      "tag": "Value King",
+      "name": "Nissan Magnite",
+      "tagType": "secondary",
+      "priceRange": "₹6-11L",
+      "keyDifferentiator": "SUV body style under ₹8L with touchscreen, 6 airbags, 4-star safety rating, digital cluster, and 16-inch wheels as standard"
+    }
+  ],
+  "segmentScorecard": {
+    "badge": "3 Leading",
+    "summary": "The 2024 Maruti Dzire dominates the compact sedan segment in safety and fuel efficiency, earning top honors with its 5-star NCAP rating and class-leading 25+ kmpl mileage. While it offers exceptional value with competitive pricing and extensive features, buyers seeking outright performance or premium cabin feel may find rivals more appealing. Ideal for efficiency-focused buyers who prioritize safety and low running costs over driving engagement.",
+    "categories": [
+      {
+        "rank": "#1 of 6",
+        "status": "Best in class",
+        "category": "Safety & Security",
+        "highlights": [
+          "5-star Global NCAP safety rating - highest in compact sedan segment",
+          "6 airbags standard across variants, setting new segment benchmark",
+          "Purpose-built sedan platform with reinforced structure"
+        ],
+        "rankNumber": 1,
+        "statusType": "positive"
+      },
+      {
+        "rank": "#1 of 6",
+        "status": "Best in class",
+        "category": "Fuel Efficiency",
+        "highlights": [
+          "Exceptional 25+ kmpl highway mileage leads segment comfortably",
+          "New 3-cylinder Z-series engine optimized for efficiency",
+          "Best-in-class real-world range reduces running costs significantly"
+        ],
+        "rankNumber": 1,
+        "statusType": "positive"
+      },
+      {
+        "rank": "#2 of 6",
+        "status": "Leads segment",
+        "category": "Value for Money",
+        "highlights": [
+          "Aggressive pricing starting at ₹6.79 lakh undercuts most rivals",
+          "Feature-loaded with 360° camera, sunroof, wireless charger at competitive price",
+          "Maruti's extensive service network ensures lower long-term ownership costs"
+        ],
+        "rankNumber": 2,
+        "statusType": "positive"
+      },
+      {
+        "rank": "#3 of 6",
+        "status": "Above Average",
+        "category": "Style & Design",
+        "highlights": [
+          "Best-looking Dzire generation with sharp angular styling praised by owners",
+          "Interior plastic quality feels average, lacks premium feel of rivals",
+          "Light-colored fabric seats prone to staining affects long-term appeal"
+        ],
+        "rankNumber": 3,
+        "statusType": "neutral"
+      },
+      {
+        "rank": "#4 of 6",
+        "status": "Average",
+        "category": "Performance & Drive",
+        "highlights": [
+          "3-cylinder engine feels sluggish compared to previous 4-cylinder unit",
+          "Adequate for city commutes but lacks punch for highway overtakes",
+          "Missing central armrest causes fatigue on long drives, affecting comfort"
+        ],
+        "rankNumber": 4,
+        "statusType": "neutral"
+      }
+    ],
+    "leadingCount": 3
+  },
+  "howMuchItReallyCosts": {
+    "location": "Delhi NCR",
+    "monthlyBurn": {
+      "emi": {
+        "note": "80% financing of on-road price",
+        "value": 17650,
+        "amount": "₹17,650",
+        "tenure": "60 months",
+        "loanAmount": 845600,
+        "interestRate": "9.5%"
+      },
+      "fuel": {
+        "note": "ARAI mileage for AMT variant",
+        "value": 4010,
+        "amount": "₹4,010",
+        "fuelPrice": "₹103/L",
+        "fuelEfficiency": "25.71 kmpl",
+        "assumedKmPerMonth": 1000
+      },
+      "service": {
+        "basis": "Annual service cost ₹15,000 (Maruti authorized service)",
+        "value": 1250,
+        "amount": "₹1,250"
+      }
+    },
+    "savingsNote": "Dzire CNG variant available - can reduce fuel costs by ~40% (₹2,400/month savings) with 33.73 km/kg efficiency",
+    "totalMonthly": {
+      "value": 22910,
+      "amount": "₹22,910"
+    },
+    "locationDefault": true,
+    "realOnRoadPrice": {
+      "value": 1057000,
+      "amount": "₹10.57L",
+      "breakdown": {
+        "rto": {
+          "value": 87067,
+          "amount": "₹87,067"
+        },
+        "insurance": {
+          "value": 37252,
+          "amount": "₹37,252"
+        },
+        "exShowroom": {
+          "value": 931300,
+          "amount": "₹9.31L"
+        },
+        "accessories": {
+          "note": "Standard accessories package",
+          "value": 30000,
+          "amount": "₹30,000"
+        }
+      }
+    },
+    "selectedVariant": "ZXi Plus AMT"
+  }
+}

@@ -123,6 +123,133 @@ function parseJsonSafely<T>(text: string, fallback: T): T {
 }
 
 /**
+ * Canonical key order for SingleVehiclePageContent and nested objects
+ * Ensures consistent JSON output matching the standard format
+ */
+const KEY_ORDER: Record<string, string[]> = {
+  root: ['vehicle', 'quickDecision', 'howMuchItReallyCosts', 'variantOptions', 
+         'segmentScorecard', 'mainCompetitors', 'goodTimeToBuy', 'ownerPulse', 'dataSource'],
+  vehicle: ['make', 'model', 'year', 'segment'],
+  quickDecision: ['priceRange', 'idealFor', 'verdict', 'perfectIf', 'skipIf', 'keyAdvantage'],
+  priceRange: ['min', 'max', 'minValue', 'maxValue', 'priceType'],
+  verdict: ['headline', 'summary', 'highlightType'],
+  idealFor: ['label', 'icon'],
+  howMuchItReallyCosts: ['location', 'locationDefault', 'selectedVariant', 'realOnRoadPrice', 
+                          'monthlyBurn', 'totalMonthly', 'savingsNote', 'ctaLink'],
+  realOnRoadPrice: ['amount', 'value', 'breakdown'],
+  breakdown: ['exShowroom', 'rto', 'insurance', 'accessories'],
+  monthlyBurn: ['emi', 'fuel', 'service'],
+  emi: ['amount', 'value', 'loanAmount', 'tenure', 'interestRate'],
+  fuel: ['amount', 'value', 'assumedKmPerMonth', 'fuelEfficiency', 'fuelPrice'],
+  service: ['amount', 'value', 'basis'],
+  totalMonthly: ['amount', 'value'],
+  variantOptions: ['fuelType', 'transmission', 'engineType', 'wheelTypes', 'heroFeatures', 'cta'],
+  fuelTypeItem: ['label', 'value', 'isDefault', 'variants'],
+  transmissionItem: ['label', 'value', 'availableWith'],
+  engineTypeItem: ['label', 'value', 'power', 'torque', 'fuelType'],
+  wheelTypeItem: ['label', 'value', 'availableOn'],
+  heroFeatureItem: ['label', 'icon', 'availableFrom'],
+  segmentScorecard: ['leadingCount', 'badge', 'categories', 'summary'],
+  category: ['name', 'rank', 'rankNumber', 'totalInSegment', 'status', 'statusType', 'highlights'],
+  competitor: ['name', 'tag', 'tagType', 'priceRange', 'imageUrl', 'keyDifferentiator'],
+  goodTimeToBuy: ['overallSignal', 'overallSignalType', 'salesRank', 'lifecycleCheck', 
+                   'timingSignal', 'stockAvailability'],
+  salesRank: ['label', 'value', 'description'],
+  lifecycleCheck: ['label', 'status', 'statusType', 'faceliftExpected', 'generationYear'],
+  timingSignal: ['label', 'status', 'statusType', 'reason'],
+  stockAvailability: ['color', 'colorCode', 'waitingPeriod'],
+  ownerPulse: ['rating', 'totalReviews', 'mostPraised', 'mostCriticized'],
+  sentimentItem: ['text', 'category'],
+  dataSource: ['corpus', 'totalVideos', 'totalComments', 'sources', 'extractedAt', 'lastUpdated']
+};
+
+/**
+ * Reorder keys in an object according to the specified order
+ */
+function reorderObjectKeys<T extends Record<string, unknown>>(obj: T, orderKey: string): T {
+  const keyOrder = KEY_ORDER[orderKey];
+  if (!keyOrder || typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+  
+  const ordered = {} as T;
+  
+  // Add keys in the specified order
+  for (const key of keyOrder) {
+    if (key in obj) {
+      ordered[key as keyof T] = obj[key as keyof T];
+    }
+  }
+  
+  // Add any remaining keys not in the order list
+  for (const key in obj) {
+    if (!(key in ordered)) {
+      ordered[key as keyof T] = obj[key as keyof T];
+    }
+  }
+  
+  return ordered;
+}
+
+/**
+ * Recursively reorder all keys in the SingleVehiclePageContent structure
+ */
+function reorderPageContentKeys(content: SingleVehiclePageContent): SingleVehiclePageContent {
+  // Reorder nested objects
+  const orderedContent = {
+    vehicle: reorderObjectKeys(content.vehicle, 'vehicle'),
+    quickDecision: {
+      ...reorderObjectKeys(content.quickDecision, 'quickDecision'),
+      priceRange: reorderObjectKeys(content.quickDecision.priceRange, 'priceRange'),
+      verdict: reorderObjectKeys(content.quickDecision.verdict, 'verdict'),
+      idealFor: content.quickDecision.idealFor.map(item => reorderObjectKeys(item, 'idealFor'))
+    },
+    howMuchItReallyCosts: reorderObjectKeys({
+      ...content.howMuchItReallyCosts,
+      realOnRoadPrice: {
+        ...content.howMuchItReallyCosts.realOnRoadPrice,
+        breakdown: reorderObjectKeys(content.howMuchItReallyCosts.realOnRoadPrice.breakdown, 'breakdown')
+      },
+      monthlyBurn: {
+        emi: reorderObjectKeys(content.howMuchItReallyCosts.monthlyBurn.emi, 'emi'),
+        fuel: reorderObjectKeys(content.howMuchItReallyCosts.monthlyBurn.fuel, 'fuel'),
+        service: reorderObjectKeys(content.howMuchItReallyCosts.monthlyBurn.service, 'service')
+      },
+      totalMonthly: reorderObjectKeys(content.howMuchItReallyCosts.totalMonthly, 'totalMonthly')
+    }, 'howMuchItReallyCosts'),
+    variantOptions: reorderObjectKeys({
+      ...content.variantOptions,
+      fuelType: content.variantOptions.fuelType.map(item => reorderObjectKeys(item, 'fuelTypeItem')),
+      transmission: content.variantOptions.transmission.map(item => reorderObjectKeys(item, 'transmissionItem')),
+      engineType: content.variantOptions.engineType.map(item => reorderObjectKeys(item, 'engineTypeItem')),
+      wheelTypes: content.variantOptions.wheelTypes?.map(item => reorderObjectKeys(item, 'wheelTypeItem')),
+      heroFeatures: content.variantOptions.heroFeatures.map(item => reorderObjectKeys(item, 'heroFeatureItem'))
+    }, 'variantOptions'),
+    segmentScorecard: reorderObjectKeys({
+      ...content.segmentScorecard,
+      categories: content.segmentScorecard.categories.map(cat => reorderObjectKeys(cat, 'category'))
+    }, 'segmentScorecard'),
+    mainCompetitors: content.mainCompetitors.map(comp => reorderObjectKeys(comp, 'competitor')),
+    goodTimeToBuy: reorderObjectKeys({
+      ...content.goodTimeToBuy,
+      salesRank: reorderObjectKeys(content.goodTimeToBuy.salesRank, 'salesRank'),
+      lifecycleCheck: reorderObjectKeys(content.goodTimeToBuy.lifecycleCheck, 'lifecycleCheck'),
+      timingSignal: reorderObjectKeys(content.goodTimeToBuy.timingSignal, 'timingSignal'),
+      stockAvailability: content.goodTimeToBuy.stockAvailability.map(item => reorderObjectKeys(item, 'stockAvailability'))
+    }, 'goodTimeToBuy'),
+    ownerPulse: reorderObjectKeys({
+      ...content.ownerPulse,
+      mostPraised: content.ownerPulse.mostPraised.map(item => reorderObjectKeys(item, 'sentimentItem')),
+      mostCriticized: content.ownerPulse.mostCriticized.map(item => reorderObjectKeys(item, 'sentimentItem'))
+    }, 'ownerPulse'),
+    dataSource: reorderObjectKeys(content.dataSource, 'dataSource')
+  };
+  
+  // Reorder the root object
+  return reorderObjectKeys(orderedContent as SingleVehiclePageContent, 'root');
+}
+
+/**
  * Create Anthropic client
  */
 function getClient(): Anthropic {
@@ -724,6 +851,9 @@ export async function generateSingleVehicleContent(
     }
   };
   
+  // Apply key ordering to ensure consistent JSON output
+  const orderedContent = reorderPageContentKeys(content);
+  
   const processingTime = Date.now() - startTime;
   const stepsCompleted = hasWebSearch ? 9 : 6; // More steps with web search
   
@@ -737,7 +867,7 @@ export async function generateSingleVehicleContent(
   });
   
   return {
-    content,
+    content: orderedContent,
     metadata: {
       generated_at: new Date().toISOString(),
       processing_time_ms: processingTime,
