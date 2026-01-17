@@ -167,7 +167,7 @@ export function SingleCorpusView() {
       {metadata.validation && metadata.validation.isValid && (
         <div className="flex items-center gap-2 mb-4 text-emerald-600">
           <Check className="w-4 h-4" />
-          <span className="text-xs">Corpus validation passed ({metadata.validation.confidence}% match for "{metadata.validation.modelName}")</span>
+          <span className="text-xs">Corpus validation passed ({metadata.validation.confidence}% match for &ldquo;{metadata.validation.modelName}&rdquo;)</span>
         </div>
       )}
       
